@@ -599,24 +599,26 @@
       azBarFill = $('#azBarFill'), azPhases = $$('#azPhases li'), azLog = $('#azLog'),
       azStart = $('#azStart'), azDemo = $('#azDemo'), azReset = $('#azReset'), azReport = $('#azReport');
   var jyLocked = $('#jyLocked'), jyCursor = $('#jyCursor'), jySpot = $('#jySpot'),
-      jcNo = $('#jcNo'), jcTxt = $('#jcTxt'), jySteps = $('#jySteps');
+      jcNo = $('#jcNo'), jcTxt = $('#jcTxt'), jyFlow = $('#jyFlow'),
+      jyFlowWrap = $('#jyFlowWrap'), jyAuto = $('#jyAuto'),
+      azWide = $('#azWide'), shotList = $('#shotList');
   var azBusy = false, jyTimer = null, jyStepIdx = 0;
 
-  /* 剪映动图教学步骤：位置为 stage 内百分比坐标；hi 为高亮目标元素 data-jy */
+  /* 剪映动图教学步骤：位置为 stage 内百分比坐标；hi 为高亮目标元素 data-jy；
+     ft/fd 为流程图节点标题/副标题。全部步骤仅使用剪映专业版免费功能 */
   var JY_STEPS = [
-    { t: '点击「媒体」面板的【导入素材】，把解构出的原片拖入素材库（剪映专业版免费功能）', s: '+ 导入素材到媒体库', x: 10, y: 25, hi: ['import', 'tab-media'] },
-    { t: '将素材拖到下方【时间轴】主轨道，粗剪出与原片一致的镜头顺序', s: '拖入时间轴主视频轨', x: 50, y: 86, hi: ['timeline'] },
-    { t: '选中片段 → 右上【变速】→「曲线变速」选「蒙太奇」，免费复刻原片节奏', s: '片段 · 变速 · 曲线变速', x: 88, y: 30, hi: ['p-speed'] },
-    { t: '在镜头交界处点【转场】，选免费「叠化 / 闪白」，对齐解构出的鼓点位置', s: '镜头交界添加免费转场', x: 88, y: 40, hi: ['p-trans'] },
-    { t: '给关键帧打【关键帧 ⭐】+ 缓慢缩放，用「文本 → 花字」加免费花字字幕', s: '关键帧 + 免费花字字幕', x: 88, y: 56, hi: ['p-key', 'p-text'] },
-    { t: '全部对齐后点右上【导出】，参数保持默认即可，全程未使用任何付费项', s: '导出 · 全程免费功能', x: 92, y: 13, hi: ['export'] }
+    { t: '点击左上角素材面板的【＋ 导入】，把原片拖入本地素材库（媒体面板为免费功能）', s: '＋ 导入素材到本地媒体库', x: 14, y: 24, hi: ['import', 'tab-media'], ft: '导入素材', fd: '媒体 · 本地' },
+    { t: '把素材拖入底部【时间轴】主轨道，用工具条【✂ 分割】在镜头交界处切开，粗剪出与原片一致的镜头顺序', s: '拖入主轨 · ✂ 分割粗剪', x: 50, y: 88, hi: ['timeline', 'split'], ft: '粗剪分割', fd: '主轨 · 分割' },
+    { t: '选中音频 → 点工具条【♪ 自动踩点】选「节拍 Ⅰ」，时间轴出现黄色鼓点标记，把每个镜头切点拖到鼓点严格对齐', s: '自动踩点 · 切点对齐鼓点', x: 63, y: 76, hi: ['beat'], ft: '自动踩点', fd: '节拍Ⅰ · 卡点' },
+    { t: '在两段素材交界处点【转场】→ 分类「叠化」中选免费『叠化』或『闪白』，时长 0.4~0.6s，对准鼓点瞬间切出', s: '加免费转场：叠化 / 闪白', x: 24, y: 12, hi: ['tab-tr'], ft: '转场 · 叠化/闪白', fd: '转场面板 · 免费' },
+    { t: '选中片段 → 右侧属性面板【变速】→「曲线变速」选免费预设『蒙太奇』，高潮段自动 0.4x → 1.8x 起伏', s: '曲线变速 · 蒙太奇', x: 86, y: 14, hi: ['p-speed', 'p-curve', 'cv-mont'], ft: '曲线变速', fd: '蒙太奇 · 免费' },
+    { t: '在推近镜头起点与终点各打一个【◈ 关键帧】，缩放 100% → 112% 做缓推；再用【文本 → 花字】加免费花字标题', s: '关键帧缓推 ＋ 免费花字', x: 86, y: 46, hi: ['p-key', 'p-text'], ft: '关键帧＋花字', fd: '缩放 100→112%' },
+    { t: '全部对齐后点右上角【导出】，保持默认参数即可导出成片 —— 全流程只用了剪映免费功能', s: '导出成片 · 全程免费', x: 88, y: 3.5, hi: ['export'], ft: '导出成片', fd: '默认参数' }
   ];
 
   function jyHighlight(keys) {
     $$('#jyStage [data-jy]').forEach(function (el) {
-      if (keys.indexOf(el.dataset.jy) >= 0) el.classList.add('hi');
-      else if (el.classList.contains('jy-tab') || el.classList.contains('jy-ptab') ||
-               el.classList.contains('jy-import') || el.classList.contains('jy-timeline')) el.classList.remove('hi');
+      el.classList.toggle('hi', keys.indexOf(el.dataset.jy) >= 0);
     });
   }
   function jyType(text, done) {
@@ -630,7 +632,7 @@
     })();
   }
   function jyShowStep(idx) {
-    jyStepIdx = idx % JY_STEPS.length;
+    jyStepIdx = ((idx % JY_STEPS.length) + JY_STEPS.length) % JY_STEPS.length;
     var s = JY_STEPS[jyStepIdx];
     jcNo.textContent = 'STEP ' + pad(jyStepIdx + 1) + ' / ' + pad(JY_STEPS.length);
     jyCursor.style.left = s.x + '%'; jyCursor.style.top = s.y + '%';
@@ -639,38 +641,169 @@
     jyType(s.t);
     var sub = $('#jsSub');
     if (sub) { sub.textContent = s.s || ''; sub.classList.add('on'); }
-    $$('.jy-chip', jySteps).forEach(function (c, i) { c.classList.toggle('on', i === jyStepIdx); });
+    $$('.jf-node', jyFlow).forEach(function (n, i) {
+      n.classList.toggle('on', i === jyStepIdx);
+      n.classList.toggle('done', i < jyStepIdx);
+    });
+  }
+  function jyAutoUI(playing) {
+    jyAuto.classList.toggle('on', playing);
+    jyAuto.innerHTML = playing ? '<i>⏸</i>自动播放中' : '<i>▶</i>自动播放';
   }
   function jyPlayLoop() {
     jyStopLoop();
-    jyTimer = 1;
+    jyTimer = 1; jyAutoUI(true);
     (function tick() {
       if (jyTimer === null) return;
       jyShowStep(jyStepIdx);
-      jyTimer = setTimeout(tick, 3600);
+      jyTimer = setTimeout(function () { jyStepIdx = (jyStepIdx + 1) % JY_STEPS.length; tick(); }, 3600);
     })();
   }
   function jyStopLoop() {
     if (jyTimer && jyTimer !== 1) clearTimeout(jyTimer);
     jyTimer = null;
   }
-  function jyBuildChips() {
-    jySteps.innerHTML = JY_STEPS.map(function (s, i) {
-      return '<button class="jy-chip" data-i="' + i + '">STEP ' + pad(i + 1) + '</button>';
+  /* 流程图节点：点击查看即停止自动播放，用户可用「自动播放」按钮自行恢复 */
+  function jfBuild() {
+    jyFlow.innerHTML = JY_STEPS.map(function (s, i) {
+      return '<button class="jf-node" data-i="' + i + '">' +
+        '<span class="jf-no">STEP ' + pad(i + 1) + '</span>' +
+        '<b>' + s.ft + '</b><span class="jf-d">' + s.fd + '</span></button>';
     }).join('');
-    $$('.jy-chip', jySteps).forEach(function (c) {
-      c.addEventListener('click', function () {
-        if (jyTimer === null) return; // 未解锁不响应
-        jyStopLoop();
-        jyShowStep(parseInt(c.dataset.i, 10));
-        jyTimer = setTimeout(function tickLoop() {
-          jyShowStep(jyStepIdx + 1);
-          jyTimer = setTimeout(tickLoop, 3600);
-        }, 3600);
+    $$('.jf-node', jyFlow).forEach(function (n) {
+      n.addEventListener('click', function () {
+        if (jyFlowWrap.classList.contains('locked')) return;
+        jyStopLoop(); jyAutoUI(false);
+        jyShowStep(parseInt(n.dataset.i, 10));
       });
     });
   }
-  jyBuildChips();
+  jfBuild();
+  jyAuto.addEventListener('click', function () {
+    if (jyAuto.disabled) return;
+    if (jyTimer !== null) { jyStopLoop(); jyAutoUI(false); }
+    else { jyPlayLoop(); }
+  });
+
+  /* ================= 分镜级解构报告（转场/特效均为剪映专业版免费功能真实名称） ================= */
+  var SHOT_PLANS = [
+    [ /* 高燃卡点型 */
+      { range: '00:00.0 – 00:02.4', name: '开场钩子', shot: '特写 · 手持急推镜', role: '情感',
+        why: '特写 + 急推在 3 秒内砸出视觉锤，把核心悬念直接怼到观众眼前，留住完播',
+        trans: { n: '闪白', path: '转场 → 叠化 → 闪白', dur: '0.3s' }, fx: { n: '荧光线描', path: '特效 → 氛围 → 荧光线描' },
+        beat: '音频 → 踩点 → 自动踩点（节拍Ⅰ）生成黄色鼓点；第 1 个鼓点与画面爆出瞬间严格同帧',
+        key: '第 0 帧打缩放关键帧 100%，第 12 帧打 118%，两帧之间自动补间成急促推近',
+        speed: '常规变速 1.3x 快放，与闪白切出同帧结束' },
+      { range: '00:02.4 – 00:05.0', name: '主体亮相', shot: '中景 · 横向移镜', role: '衔接',
+        why: '承接钩子的情绪高点，横向移动把视线从悬念引到主体画面，完成空间转换',
+        trans: { n: '叠化', path: '转场 → 叠化 → 叠化', dur: '0.5s' }, fx: { n: '星火', path: '特效 → 氛围 → 星火' },
+        beat: '鼓点落在横向位移的终点帧，切点对准第 2 个鼓点',
+        key: '位置关键帧：起点 X 偏移 -8%，终点归零，手动打 2 帧即可',
+        speed: '曲线变速「英雄时刻」：亮相瞬间压到 0.5x，0.4s 后拉回 1.0x' },
+      { range: '00:05.0 – 00:08.2', name: '高光连击', shot: '近景 · 手持快切三连', role: '情感',
+        why: '3 段快切堆叠爽感，每段只保留击中最痛的 8 帧，情绪密度拉满',
+        trans: { n: '闪黑', path: '转场 → 叠化 → 闪黑', dur: '0.2s' }, fx: { n: '录制边框', path: '特效 → 复古 → 录制边框' },
+        beat: '三连切分别对准连续 3 个鼓点，形成「咚-咚-咚」的打点节奏',
+        key: '每段首帧缩放 106%，末帧 100%，切出前归零避免跳帧感',
+        speed: '曲线变速「蒙太奇」：每次命中瞬间 0.4x 定格 0.2s 再弹回 1.6x' },
+      { range: '00:08.2 – 00:11.6', name: '情绪缓冲', shot: '全景 · 固定机位慢摇', role: '衔接',
+        why: '高潮后给 1.5 秒喘息，慢摇镜头把情绪从竞技切到人物反应，为收尾蓄势',
+        trans: { n: '泛光', path: '转场 → 光效 → 泛光', dur: '0.6s' }, fx: { n: '复古DV', path: '特效 → 复古 → 复古DV' },
+        beat: '此段避开密集鼓点，压在底鼓长音上，速度放缓',
+        key: '旋转关键帧 -1.2° → 0°，配合缩放 100% → 104%，做极轻微呼吸感',
+        speed: '常规变速 0.8x 慢放' },
+      { range: '00:11.6 – 00:15.0', name: '定格收尾', shot: '特写 · 升降格定格', role: '情感',
+        why: '定格 + 花字落版，给观众截图传播的记忆点',
+        trans: { n: '叠化', path: '转场 → 叠化 → 叠化', dur: '0.8s 长尾' }, fx: { n: '闭幕', path: '特效 → 基础 → 闭幕' },
+        beat: '最后一个重鼓点 = 定格帧 + 花字弹出同帧，之后 BGM 自然衰减',
+        key: '花字缩放 60% → 100% 弹入（2 帧），定格画面保持不动',
+        speed: '曲线变速「子弹时间」：命中瞬间 0.2x 急停后完全定格' }
+    ],
+    [ /* 情感叙事型 */
+      { range: '00:00.0 – 00:03.0', name: '悬念开场', shot: '大远景 · 缓推', role: '情感',
+        why: '虚焦画面缓推亮起，把「这是什么」的悬念留给观众，钩住前 3 秒',
+        trans: { n: '叠化', path: '转场 → 叠化 → 叠化', dur: '1.0s' }, fx: { n: '复古DV', path: '特效 → 复古 → 复古DV' },
+        beat: '钢琴第一个重音与画面亮起同帧；踩点选「节拍Ⅱ」疏模式，避免过密',
+        key: '缩放 100% → 108% 全程缓推，首末 2 个关键帧即可',
+        speed: '常规变速 0.9x，保持叙事呼吸感' },
+      { range: '00:03.0 – 00:06.0', name: '时光闪回', shot: '中景 · 横移扫描', role: '衔接',
+        why: '素材横移扫过，把观众从悬念带进回忆段落，完成时空过渡',
+        trans: { n: '色彩溶解', path: '转场 → 叠化 → 色彩溶解', dur: '0.8s' }, fx: { n: '星火', path: '特效 → 氛围 → 星火' },
+        beat: '旋律句读处切换，每 2 个鼓点切一个画面',
+        key: '位置关键帧从左到右移动 6%，模拟扫描仪匀速运动',
+        speed: '常规变速 1.0x 原速，保持扫描稳定' },
+      { range: '00:06.0 – 00:09.0', name: '揭晓瞬间', shot: '特写 · 前后对比硬切', role: '情感',
+        why: '前后对比在重拍点揭晓，制造全片情绪峰值（泪点/爽点）',
+        trans: { n: '闪白', path: '转场 → 叠化 → 闪白', dur: '0.4s' }, fx: { n: '荧光线描', path: '特效 → 氛围 → 荧光线描' },
+        beat: '揭晓帧卡在全曲最强鼓点，切点前 0.1s 把音量拉低蓄势再爆发',
+        key: '缩放 100% → 115% 急推 + 不透明度 2 帧淡入',
+        speed: '曲线变速「英雄时刻」：揭晓瞬间 0.4x 慢放' },
+      { range: '00:09.0 – 00:12.0', name: '情绪延展', shot: '近景 · 环绕运镜', role: '衔接',
+        why: '峰值后不接硬切，用环绕镜头让情绪缓缓落地，避免戛然而止',
+        trans: { n: '叠化', path: '转场 → 叠化 → 叠化', dur: '0.6s' }, fx: { n: '复古DV', path: '特效 → 复古 → 复古DV' },
+        beat: '鼓点密度减半，切点放宽到每 4 拍一次',
+        key: '缩放 105% 恒定，只打旋转 -1° → 1° 的呼吸帧',
+        speed: '常规变速 0.85x' },
+      { range: '00:12.0 – 00:15.0', name: '落版收尾', shot: '特写 · 渐隐定格', role: '情感',
+        why: '花字寄语 + 渐隐落版，引导评论区互动与二创',
+        trans: { n: '水墨', path: '转场 → 自然 → 水墨', dur: '1.0s' }, fx: { n: '闭幕', path: '特效 → 基础 → 闭幕' },
+        beat: '尾音衰减起点 = 渐隐起点，声音与画面一起收',
+        key: '不透明度 100% → 0% 末段 2 帧；花字自 80% 放大弹入',
+        speed: '曲线变速「蒙太奇」尾段自然降速至定格' }
+    ],
+    [ /* 节奏混剪通用型 */
+      { range: '00:00.0 – 00:02.0', name: '强节奏入场', shot: '特写 · 甩镜入场', role: '情感',
+        why: '甩镜与鼓点同步入场，第一秒就立住节奏人设',
+        trans: { n: '闪黑', path: '转场 → 叠化 → 闪黑', dur: '0.2s' }, fx: { n: '荧光线描', path: '特效 → 氛围 → 荧光线描' },
+        beat: '自动踩点（节拍Ⅰ），入场帧 = 第 1 个鼓点',
+        key: '位置 X -30% → 0，两帧甩入',
+        speed: '常规变速 1.2x' },
+      { range: '00:02.0 – 00:05.5', name: '素材串联', shot: '中景 · 跳切组接', role: '衔接',
+        why: '同动作跳切压缩时间，把散乱素材拧成一股节奏',
+        trans: { n: '推近', path: '转场 → 运镜 → 推近', dur: '0.4s' }, fx: { n: '星火', path: '特效 → 氛围 → 星火' },
+        beat: '每个跳切点都压在鼓点上，形成「动作 = 打点」的体感',
+        key: '每段首帧缩放 104%，末帧回到 100%',
+        speed: '曲线变速「蒙太奇」自动起伏' },
+      { range: '00:05.5 – 00:08.5', name: '高潮变速', shot: '近景 · 急停急起', role: '情感',
+        why: '0.3x → 2.0x 的速度落差制造爽点峰值',
+        trans: { n: '闪白', path: '转场 → 叠化 → 闪白', dur: '0.3s' }, fx: { n: '录制边框', path: '特效 → 复古 → 录制边框' },
+        beat: '最强鼓点 = 速度最低点，视听双重重击',
+        key: '缩放 100% → 112% 随速度曲线同步推近',
+        speed: '曲线变速「子弹时间」：0.3x 急停后拉到 2.0x' },
+      { range: '00:08.5 – 00:12.0', name: '节奏回落', shot: '全景 · 固定长镜', role: '衔接',
+        why: '长镜头给观众喘息，为下一波高潮铺垫',
+        trans: { n: '渐变擦除', path: '转场 → 擦除 → 渐变擦除', dur: '0.6s' }, fx: { n: '复古DV', path: '特效 → 复古 → 复古DV' },
+        beat: '切换为每 2 拍一切，密度减半',
+        key: '无运动帧，仅 100% 定帧即可',
+        speed: '常规变速 1.0x' },
+      { range: '00:12.0 – 00:15.0', name: '定格落版', shot: '特写 · 定格 + 花字', role: '情感',
+        why: '定格帧留给花字标题，承担传播记忆点',
+        trans: { n: '叠化', path: '转场 → 叠化 → 叠化', dur: '0.8s' }, fx: { n: '闭幕', path: '特效 → 基础 → 闭幕' },
+        beat: '尾鼓点定格，BGM 衰减对齐渐隐',
+        key: '花字缩放 70% → 100% 弹入（2 帧）',
+        speed: '曲线变速「英雄时刻」收尾' }
+    ]
+  ];
+  function renderShots() {
+    var plan = SHOT_PLANS[Math.floor(Math.random() * SHOT_PLANS.length)];
+    function kv(k, v, wide) { return '<div class="sh-kv' + (wide ? ' wide' : '') + '"><span>' + k + '</span><p>' + v + '</p></div>'; }
+    shotList.innerHTML = plan.map(function (sh, i) {
+      return '<article class="shot" style="animation-delay:' + (i * 0.08).toFixed(2) + 's">' +
+        '<header><span class="sh-no">SHOT ' + pad(i + 1) + '</span>' +
+        '<span class="sh-range">' + sh.range + '</span>' +
+        '<b class="sh-name">' + sh.name + '</b>' +
+        '<span class="sh-role ' + (sh.role === '衔接' ? 'r-trans' : 'r-emo') + '">' + sh.role + '镜头</span></header>' +
+        '<div class="sh-grid">' +
+          kv('镜头语言', '<b>' + sh.shot + '</b>') +
+          kv('镜头作用 · 为什么这样剪', sh.why) +
+          kv('转场 · 剪映免费', '「<b>' + sh.trans.n + '</b>」 · ' + sh.trans.path + ' · 时长 ' + sh.trans.dur) +
+          kv('特效 · 剪映免费', '「<b>' + sh.fx.n + '</b>」 · ' + sh.fx.path) +
+          kv('音乐卡点', sh.beat) +
+          kv('关键帧', sh.key) +
+          kv('变速', sh.speed, 1) +
+        '</div></article>';
+    }).join('');
+  }
 
   function azLogPush(line) {
     azLog.textContent += '\n' + line;
@@ -761,6 +894,12 @@
     azLog.textContent = '$ load :: ' + esc(name) + ' — 就绪，点击「开始解构」';
     azBarFill.style.width = '0%'; azSetPhases(-1);
     azReport.hidden = true;
+    jyStopLoop(); jyAutoUI(false); jyAuto.disabled = true;
+    jyFlowWrap.classList.add('locked');
+    $$('.jf-node', jyFlow).forEach(function (n) { n.classList.remove('on', 'done'); });
+    jyHighlight([]);
+    azWide.hidden = true; shotList.innerHTML = '';
+    jcNo.textContent = 'STEP 01'; jcTxt.textContent = '等待解构完成…'; jcTxt.classList.add('full');
 
     if (curObjUrl) { try { URL.revokeObjectURL(curObjUrl); } catch (e) {} curObjUrl = null; }
     clearJyVideo();
@@ -812,15 +951,19 @@
       } else {
         azSetPhases(5);
         azBarFill.style.width = '100%';
-        azLogPush('$ analyze :: DONE — 解构报告已生成，右栏动图教学已解锁');
+        azLogPush('$ analyze :: DONE — 解构报告已生成，分镜解析与动图教学已解锁');
         azReport.hidden = false;
-        countUp($('#rpCuts'), 8 + Math.floor(Math.random() * 9), {});
+        countUp($('#rpCuts'), 5, {});
         countUp($('#rpBeats'), 4 + Math.floor(Math.random() * 7), {});
-        countUp($('#rpFree'), 96, { suffix: '%', dec: 0 });
+        countUp($('#rpFree'), 100, { suffix: '%', dec: 0 });
         jyLocked.hidden = true;
+        jyFlowWrap.classList.remove('locked');
+        jyAuto.disabled = false;
+        azWide.hidden = false;
+        renderShots();
         jyStepIdx = 0; jyPlayLoop();
         azBusy = false; azStart.disabled = false; azDemo.disabled = false;
-        toast('视频解构完成 · 剪映免费操作教学已解锁');
+        toast('解构完成 · 分镜报告 + 剪映免费操作教学已解锁');
       }
     })();
   }
@@ -844,10 +987,14 @@
   });
   azStart.addEventListener('click', azAnalyze);
   azReset.addEventListener('click', function () {
-    jyStopLoop(); azBusy = false;
+    jyStopLoop(); jyAutoUI(false); jyAuto.disabled = true; azBusy = false;
     azRun.hidden = true; azReport.hidden = true; azReset.hidden = true;
     azStart.disabled = true; azDemo.disabled = false; azFile.value = '';
     azClearMedia();
+    azWide.hidden = true; shotList.innerHTML = '';
+    jyFlowWrap.classList.add('locked');
+    $$('.jf-node', jyFlow).forEach(function (n) { n.classList.remove('on', 'done'); });
+    jyHighlight([]);
     jyLocked.hidden = false;
     jyLocked.innerHTML = '<b>LOCKED</b><span>完成左侧视频解构后<br>自动解锁剪映免费操作动图教学</span>';
     azLog.textContent = '$ ready. 等待导入视频…';
