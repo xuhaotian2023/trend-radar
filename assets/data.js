@@ -1,6 +1,6 @@
 /* 热点雷达 · 模拟数据层（演示原型，接入真实抓取 API 后替换本文件即可） */
 window.RADAR_DATA = {
-  updatedAt: '2026-10-15 14:30',
+  updatedAt: '2026-10-15 18:30',
   platforms: [
     {
       id: 'douyin', name: '抖音', en: 'DOUYIN', color: '#FE2C55', color2: '#25F4EE',
@@ -10,9 +10,9 @@ window.RADAR_DATA = {
       desc: '算法中心化分发，热点爆发力最强、生命周期最短。强情绪、强节奏内容占主导，卡点快剪与悬念前置是流量入场券，挑战赛模板是裂变核心引擎。',
       topics: [
         {
-          id: 'dy1', title: '国庆特种兵旅行挑战', cat: '生活方式', heat: 97, growth: 18.4, est: 28600, confidence: 87,
-          tech: { rhythm: 92, trans: 88, sub: 90, sound: 94, desc: '高密度卡点快剪，平均 <b>0.8 秒/镜头</b>；前 3 秒以大字标题抛出钩子，鼓点 BGM 与转场严格对拍，结尾定格引导合拍。' },
-          core: { narr: '目标清单式叙事，打卡点位逐个引爆', emo: '多巴胺刺激 + 集体出游共鸣', aud: '18-30 岁学生与都市白领', spread: '挑战赛模板接力，UGC 复拍裂变' }
+          id: 'dy1', title: '无畏契约冠军赛 LOUD 2:0 横扫 PRX', cat: '游戏', heat: 96, growth: 35.6, est: 27500, confidence: 88,
+          tech: { rhythm: 94, trans: 90, sub: 86, sound: 92, desc: '赛事高光<b>逐回合快剪</b>，击杀镜头与音效爆点严格卡点；前 3 秒抛出比分悬念钩子，弹幕式花字同步战况，结尾定格赛点回放。' },
+          core: { narr: '比分悬念结构，关键回合逐层引爆', emo: '竞技热血 + 逆袭爽感', aud: '16-30 岁电竞与 FPS 玩家', spread: '赛事切片矩阵联动，评分梗图二创接力' }
         },
         {
           id: 'dy2', title: 'AI 复活老照片', cat: '情感科技', heat: 95, growth: 32.1, est: 24100, confidence: 90,
@@ -54,9 +54,9 @@ window.RADAR_DATA = {
           core: { narr: '工序流全景记录', emo: '极客成就感 + 解压', aud: '18-30 岁数码硬件圈层', spread: '硬件区联动，配件清单置顶转化' }
         },
         {
-          id: 'bl3', title: '期末周图书馆实录', cat: '校园纪实', heat: 86, growth: 28.5, est: 7400, confidence: 81,
-          tech: { rhythm: 75, trans: 70, sub: 79, sound: 80, desc: '<b>固定机位 + 快进压缩</b>时间流逝；角标时间戳强化真实感，白噪音环境声营造在场氛围。' },
-          core: { narr: '时间流逝蒙太奇', emo: '备考焦虑共情', aud: '16-24 岁在校生', spread: '期末季话题聚合，学习搭子招募发酵' }
+          id: 'bl3', title: '三角洲行动高燃混剪', cat: '游戏', heat: 87, growth: 26.4, est: 7600, confidence: 84,
+          tech: { rhythm: 91, trans: 85, sub: 76, sound: 89, desc: '<b>高光击杀蒙太奇</b>，鼓点与开火爆头严格对拍；燃向 BGM 铺底，慢放—快切交替制造张力，第一视角镜头增强代入感。' },
+          core: { narr: '高光集锦式击杀叙事', emo: '竞技爽感 + 攻略参考价值', aud: '16-30 岁 FPS 玩家', spread: '游戏区联动二创，赛季话题聚合发酵' }
         },
         {
           id: 'bl4', title: '沉浸式深夜电台', cat: '助眠声控', heat: 84, growth: 5.1, est: 6100, confidence: 86,
@@ -177,14 +177,14 @@ window.RADAR_DATA = {
 
 /* 模板原视频 · 站外真实视频源（经检索验证存在的平台原视频链接，非本页生成） */
 window.RADAR_DATA.orig = {
-  dy1:  { site:'哔哩哔哩', title:'Vlog EP.1 挑战一天走遍张家界森林公园', url:'https://www.bilibili.com/video/BV1JZN26mEQU/' },
+  dy1:  { site:'哔哩哔哩', title:'当LOUD 2-0 PRX后，虎扑评分+赛点回放!【2026无畏契约上海冠军赛】', url:'https://www.bilibili.com/video/BV1xqH16cE96/' },
   dy2:  { site:'哔哩哔哩', title:'【AI老照片复活】让你的老照片动起来，这就是AI的意义!', url:'https://www.bilibili.com/video/BV1RCkmYTEHq' },
   dy3:  { site:'哔哩哔哩', title:'盘点零零后整顿职场爆笑名场面', url:'https://m.bilibili.com/video/BV1tM411W7MV' },
   dy4:  { site:'哔哩哔哩', title:'碳水脑袋逛吃南宁VLOG 吃遍夜市一条街', url:'https://www.bilibili.com/video/BV1KbznBaEce/' },
   dy5:  { site:'哔哩哔哩', title:'全网最像人的小猫七七，不仅会说话还会叫奶奶', url:'https://www.bilibili.com/video/BV1akUSBmEPQ/' },
   bl1:  { site:'哔哩哔哩', title:'【4K修复测试】西游记 第一集 猴王初问世', url:'https://www.bilibili.com/video/BV1Hj9dBtETE/' },
   bl2:  { site:'哔哩哔哩', title:'零基础小白也能学会!客制化键盘从零到一完整组装教程', url:'https://www.bilibili.com/video/BV1YWK56yEiy/' },
-  bl3:  { site:'哔哩哔哩', title:'Study with me 图书馆实时学习2h30min 期末周沉浸式', url:'https://www.bilibili.com/video/BV1N2T4zHEme/' },
+  bl3:  { site:'哔哩哔哩', title:'极致爽剪 · 三角洲乱杀时刻', url:'https://www.bilibili.com/video/BV1iZ9SBNE76/' },
   bl4:  { site:'哔哩哔哩', title:'ASMR: 失眠电台 | 温柔伴你晚安', url:'https://www.bilibili.com/video/BV1UKLU64Eti/' },
   bl5:  { site:'哔哩哔哩', title:'2025年新高考一卷数学压轴题讲解', url:'https://www.bilibili.com/video/BV1ARMqzSEKm/' },
   ks1:  { site:'哔哩哔哩', title:'老宗采摘荔枝赶集贩卖，剩下荔枝回家做成罐头', url:'https://www.bilibili.com/video/BV1sFK8z4Et6/' },

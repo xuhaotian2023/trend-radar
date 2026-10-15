@@ -483,6 +483,42 @@
 
   /* ================= 当日热点视图 ================= */
   var todayHourly = null;
+  var TD_SECTIONS = [
+    { id: 'all', name: '全部' },
+    { id: 'game', name: '游戏', match: ['游戏', '电竞'] },
+    { id: 'pet', name: '萌宠', match: ['萌宠', '宠物'] },
+    { id: 'film', name: '影视娱乐', match: ['影视娱乐', '影视修复'] },
+    { id: 'food', name: '美食', match: ['美食探店', '美食'] },
+    { id: 'life', name: '生活', match: ['生活方式', '家居', '旅行攻略', '三农', '纪实', '创业'] },
+    { id: 'knowledge', name: '知识', match: ['知识科普', '知识付费', '校园纪实', '硬核DIY', '职场剧情'] },
+    { id: 'fashion', name: '时尚美妆', match: ['穿搭', '美妆', '时尚银发'] },
+    { id: 'emotion', name: '情感', match: ['情感', '情感科技', '家国影像'] },
+    { id: 'health', name: '健康', match: ['健康生活', '助眠声控', '手作', '家庭剧情'] }
+  ];
+  var tdCat = 'all';
+  function tdFilter(list) {
+    if (tdCat === 'all') return list;
+    var sec = null;
+    TD_SECTIONS.forEach(function (s) { if (s.id === tdCat) sec = s; });
+    if (!sec || !sec.match) return list;
+    return list.filter(function (o) { return sec.match.indexOf(o.t.cat) >= 0; });
+  }
+  function tdRenderCats(all) {
+    $('#tdCats').innerHTML = TD_SECTIONS.map(function (s) {
+      var n = s.id === 'all' ? all.length :
+        all.filter(function (o) { return s.match && s.match.indexOf(o.t.cat) >= 0; }).length;
+      if (n === 0 && s.id !== 'all') return '';
+      return '<button role="tab" data-cat="' + s.id + '"' + (tdCat === s.id ? ' class="on"' : '') + '>' +
+        s.name + '<span class="tc-n">' + n + '</span></button>';
+    }).join('');
+    $$('#tdCats button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (tdCat === b.dataset.cat) return;
+        tdCat = b.dataset.cat;
+        renderToday(true);
+      });
+    });
+  }
   function tdRow(o, i, showGrowth) {
     return '<div class="rank-row" data-plat="' + o.p.id + '" data-tid="' + o.t.id + '" role="button" tabindex="0">' +
       '<span class="rk">' + pad(i + 1) + '</span>' +
@@ -499,31 +535,41 @@
       row.addEventListener('keydown', function (e) { if (e.key === 'Enter') openTopic(row.dataset.plat, row.dataset.tid); });
     });
   }
-  function renderToday() {
+  function renderToday(fromCat) {
     var all = [];
     D.platforms.forEach(function (p) { p.topics.forEach(function (t) { all.push({ p: p, t: t }); }); });
     all.sort(function (a, b) { return b.t.heat - a.t.heat; });
 
-    // 今日榜首
-    var champ = all[0], ch = $('#tdChamp');
-    ch.setAttribute('data-plat', champ.p.id); ch.setAttribute('data-tid', champ.t.id);
-    ch.innerHTML =
-      '<span class="c-rank">NO.1</span>' +
-      '<span class="c-main"><b>' + esc(champ.t.title) + '</b>' +
-      '<span>' + champ.p.name + ' · ' + champ.t.cat + ' · 预估 ' + fmtWan(champ.t.est) + '</span></span>' +
-      '<span class="c-heat">' + champ.t.heat.toFixed(1) + '</span>';
-    ch.onclick = function () { openTopic(champ.p.id, champ.t.id); };
-    ch.onkeydown = function (e) { if (e.key === 'Enter') openTopic(champ.p.id, champ.t.id); };
+    if (!fromCat) tdRenderCats(all);
+    var list = tdFilter(all);
+
+    // 今日榜首（随分区切换）
+    var ch = $('#tdChamp');
+    if (list.length) {
+      var champ = list[0];
+      ch.hidden = false;
+      ch.setAttribute('data-plat', champ.p.id); ch.setAttribute('data-tid', champ.t.id);
+      ch.innerHTML =
+        '<span class="c-rank">NO.1</span>' +
+        '<span class="c-main"><b>' + esc(champ.t.title) + '</b>' +
+        '<span>' + champ.p.name + ' · ' + champ.t.cat + ' · 预估 ' + fmtWan(champ.t.est) + '</span></span>' +
+        '<span class="c-heat">' + champ.t.heat.toFixed(1) + '</span>';
+      ch.onclick = function () { openTopic(champ.p.id, champ.t.id); };
+      ch.onkeydown = function (e) { if (e.key === 'Enter') openTopic(champ.p.id, champ.t.id); };
+    } else {
+      ch.hidden = true;
+    }
 
     // 急速上升 TOP 4
-    var risers = all.slice().sort(function (a, b) { return b.t.growth - a.t.growth; }).slice(0, 4);
-    $('#tdRisers').innerHTML = risers.map(function (o, i) { return tdRow(o, i, true); }).join('');
+    var risers = list.slice().sort(function (a, b) { return b.t.growth - a.t.growth; }).slice(0, 4);
+    $('#tdRisers').innerHTML = risers.length ? risers.map(function (o, i) { return tdRow(o, i, true); }).join('')
+      : '<div class="td-empty">该分区今日暂无急速上升话题</div>';
     tdBind($('#tdRisers'));
 
     // 今日全网热榜 TOP 10
-    $('#tdRank').innerHTML = all.slice(0, 10).map(function (o, i) {
+    $('#tdRank').innerHTML = list.length ? list.slice(0, 10).map(function (o, i) {
       return tdRow(o, i, false).replace('<span class="r-est">', '<span class="r-est" title="热度">');
-    }).join('');
+    }).join('') : '<div class="td-empty">该分区今日暂无上榜话题</div>';
     tdBind($('#tdRank'));
 
     // 24 小时热度条（首次生成后保持，仅刷新榜首/榜单以跟随实时热度）
@@ -558,12 +604,12 @@
 
   /* 剪映动图教学步骤：位置为 stage 内百分比坐标；hi 为高亮目标元素 data-jy */
   var JY_STEPS = [
-    { t: '点击「媒体」面板的【导入素材】，把解构出的原片拖入素材库（剪映专业版免费功能）', x: 15, y: 30, hi: ['import', 'tab-media'] },
-    { t: '将素材拖到下方【时间轴】主轨道，粗剪出与原片一致的镜头顺序', x: 50, y: 82, hi: ['timeline'] },
-    { t: '选中片段 → 右上【变速】→「曲线变速」选「蒙太奇」，免费复刻原片节奏', x: 84, y: 55, hi: ['p-speed'] },
-    { t: '在镜头交界处点【转场】，选免费「叠化 / 闪白」，对齐解构出的鼓点位置', x: 84, y: 63, hi: ['p-trans'] },
-    { t: '给关键帧打【关键帧 ⭐】+ 缓慢缩放，用「文本 → 花字」加免费花字字幕', x: 84, y: 71, hi: ['p-key', 'p-text'] },
-    { t: '全部对齐后点右上【导出】，参数保持默认即可，全程未使用任何付费项', x: 91, y: 8, hi: ['export'] }
+    { t: '点击「媒体」面板的【导入素材】，把解构出的原片拖入素材库（剪映专业版免费功能）', s: '+ 导入素材到媒体库', x: 10, y: 25, hi: ['import', 'tab-media'] },
+    { t: '将素材拖到下方【时间轴】主轨道，粗剪出与原片一致的镜头顺序', s: '拖入时间轴主视频轨', x: 50, y: 86, hi: ['timeline'] },
+    { t: '选中片段 → 右上【变速】→「曲线变速」选「蒙太奇」，免费复刻原片节奏', s: '片段 · 变速 · 曲线变速', x: 88, y: 30, hi: ['p-speed'] },
+    { t: '在镜头交界处点【转场】，选免费「叠化 / 闪白」，对齐解构出的鼓点位置', s: '镜头交界添加免费转场', x: 88, y: 40, hi: ['p-trans'] },
+    { t: '给关键帧打【关键帧 ⭐】+ 缓慢缩放，用「文本 → 花字」加免费花字字幕', s: '关键帧 + 免费花字字幕', x: 88, y: 56, hi: ['p-key', 'p-text'] },
+    { t: '全部对齐后点右上【导出】，参数保持默认即可，全程未使用任何付费项', s: '导出 · 全程免费功能', x: 92, y: 13, hi: ['export'] }
   ];
 
   function jyHighlight(keys) {
@@ -591,6 +637,8 @@
     jySpot.style.left = s.x + '%'; jySpot.style.top = s.y + '%';
     jyHighlight(s.hi);
     jyType(s.t);
+    var sub = $('#jsSub');
+    if (sub) { sub.textContent = s.s || ''; sub.classList.add('on'); }
     $$('.jy-chip', jySteps).forEach(function (c, i) { c.classList.toggle('on', i === jyStepIdx); });
   }
   function jyPlayLoop() {
@@ -635,13 +683,112 @@
       st.textContent = i < p ? 'DONE' : (i === p ? 'RUN…' : 'IDLE');
     });
   }
-  function azLoad(name) {
+  /* ---- 视频封面抽帧 & 剪映实时渲染 ---- */
+  var dropIdle = $('#dropIdle'), dropPrev = $('#dropPrev'), dropCover = $('#dropCover'),
+      dpName = $('#dpName'), dpInfo = $('#dpInfo'),
+      jyPrev = $('#jyPrev'), jyThumbVid = $('#jyThumbVid'), jyThumbDur = $('#jyThumbDur'),
+      jsHint = $('#jsHint'), jyTc = $('#jyTc');
+  var curObjUrl = null;
+
+  function fmtDur(sec) {
+    if (!isFinite(sec) || sec < 0) sec = 0;
+    var m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return pad(m) + ':' + pad(s);
+  }
+  function grabCover(url, cb) {
+    var v = document.createElement('video');
+    v.preload = 'metadata'; v.muted = true; v.playsInline = true; v.src = url;
+    var done = false;
+    function finish(data) { if (done) return; done = true; cb(data, v); }
+    v.addEventListener('loadeddata', function () {
+      try { v.currentTime = Math.min(0.1, (v.duration || 1) * 0.05); }
+      catch (e) { finish(null); }
+    });
+    v.addEventListener('seeked', function () {
+      try {
+        var c = document.createElement('canvas');
+        c.width = v.videoWidth || 640; c.height = v.videoHeight || 360;
+        c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+        finish(c.toDataURL('image/jpeg', 0.82));
+      } catch (e) { finish(null); }
+    });
+    v.addEventListener('error', function () { finish(null); });
+    setTimeout(function () { finish(null); }, 4500);
+  }
+  function demoCover(name) {
+    var c = document.createElement('canvas'); c.width = 640; c.height = 280;
+    var g = c.getContext('2d');
+    var grad = g.createLinearGradient(0, 0, 640, 280);
+    grad.addColorStop(0, '#101a33'); grad.addColorStop(.55, '#1a1440'); grad.addColorStop(1, '#071018');
+    g.fillStyle = grad; g.fillRect(0, 0, 640, 280);
+    g.strokeStyle = 'rgba(34,211,238,.35)'; g.lineWidth = 1;
+    for (var i = -280; i < 640; i += 44) { g.beginPath(); g.moveTo(i, 280); g.lineTo(i + 280, 0); g.stroke(); }
+    g.fillStyle = 'rgba(126,243,255,.95)'; g.font = '700 26px Consolas, monospace';
+    g.fillText('DEMO FRAME', 36, 140);
+    g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '15px Consolas, monospace';
+    g.fillText(name.slice(0, 34), 36, 176);
+    return c.toDataURL('image/jpeg', 0.85);
+  }
+  function showCover(src, name, info) {
+    dropCover.src = src; dpName.textContent = name; dpInfo.textContent = info;
+    dropIdle.hidden = true; dropPrev.hidden = false;
+  }
+  function wireJyVideo(url) {
+    [jyPrev, jyThumbVid].forEach(function (v) {
+      if (!v) return;
+      v.src = url; v.currentTime = 0;
+      var p = v.play(); if (p && p.catch) p.catch(function () {});
+    });
+    if (jsHint) jsHint.style.display = 'none';
+    if (jyTc && !jyTc._bound) {
+      jyTc._bound = true;
+      if (jyPrev) jyPrev.addEventListener('timeupdate', function () {
+        var t = jyPrev.currentTime || 0, f = Math.floor((t % 1) * 30);
+        jyTc.textContent = '00:' + pad(Math.floor(t / 60)) + ':' + pad(Math.floor(t % 60)) + ':' + pad(f);
+      });
+    }
+  }
+  function clearJyVideo() {
+    [jyPrev, jyThumbVid].forEach(function (v) { if (v) { try { v.pause(); } catch (e) {} v.removeAttribute('src'); v.removeAttribute('poster'); v.load && v.load(); } });
+    if (jsHint) jsHint.style.display = '';
+    if (jyTc) jyTc.textContent = '00:00:00:00';
+  }
+
+  function azLoad(name, file) {
     azRun.hidden = false; azReset.hidden = false; azReset.disabled = false;
     azFileName.innerHTML = '<i>▸</i> ' + esc(name);
     azStart.disabled = false;
     azLog.textContent = '$ load :: ' + esc(name) + ' — 就绪，点击「开始解构」';
     azBarFill.style.width = '0%'; azSetPhases(-1);
     azReport.hidden = true;
+
+    if (curObjUrl) { try { URL.revokeObjectURL(curObjUrl); } catch (e) {} curObjUrl = null; }
+    clearJyVideo();
+
+    if (file && window.URL && URL.createObjectURL) {
+      curObjUrl = URL.createObjectURL(file);
+      var mb = (file.size / 1048576);
+      grabCover(curObjUrl, function (dataUrl, meta) {
+        var dur = meta && isFinite(meta.duration) ? fmtDur(meta.duration) : '--:--';
+        var res = meta && meta.videoWidth ? meta.videoWidth + '×' + meta.videoHeight : '—';
+        if (jyThumbDur && meta && isFinite(meta.duration)) jyThumbDur.textContent = fmtDur(meta.duration);
+        showCover(dataUrl || demoCover(name), name,
+          res + ' · ' + dur + ' · ' + (mb >= 1 ? mb.toFixed(1) + ' MB' : Math.round(file.size / 1024) + ' KB'));
+      });
+      wireJyVideo(curObjUrl);
+    } else {
+      var cvg = demoCover(name);
+      showCover(cvg, name, '演示样片 · DEMO · 本地模拟渲染');
+      [jyPrev, jyThumbVid].forEach(function (v) { if (v) v.poster = cvg; });
+      if (jsHint) jsHint.style.display = 'none';
+    }
+  }
+  function azClearMedia() {
+    if (curObjUrl) { try { URL.revokeObjectURL(curObjUrl); } catch (e) {} curObjUrl = null; }
+    clearJyVideo();
+    dropPrev.hidden = true; dropIdle.hidden = false;
+    dropCover.removeAttribute('src');
+    if (jyThumbDur) jyThumbDur.textContent = '00:15';
   }
   function azAnalyze() {
     if (azBusy || azRun.hidden) return;
@@ -687,10 +834,10 @@
   });
   azDrop.addEventListener('drop', function (e) {
     var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-    if (f) azLoad(f.name);
+    if (f) azLoad(f.name, f);
   });
   azFile.addEventListener('change', function () {
-    if (azFile.files && azFile.files[0]) azLoad(azFile.files[0].name);
+    if (azFile.files && azFile.files[0]) azLoad(azFile.files[0].name, azFile.files[0]);
   });
   azDemo.addEventListener('click', function () {
     azLoad('demo_trend_cut_' + pad(1 + Math.floor(Math.random() * 9)) + '.mp4（演示样片）');
@@ -700,6 +847,7 @@
     jyStopLoop(); azBusy = false;
     azRun.hidden = true; azReport.hidden = true; azReset.hidden = true;
     azStart.disabled = true; azDemo.disabled = false; azFile.value = '';
+    azClearMedia();
     jyLocked.hidden = false;
     jyLocked.innerHTML = '<b>LOCKED</b><span>完成左侧视频解构后<br>自动解锁剪映免费操作动图教学</span>';
     azLog.textContent = '$ ready. 等待导入视频…';

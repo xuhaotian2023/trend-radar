@@ -360,6 +360,16 @@ main{position:fixed;inset:64px 0 0 0;z-index:1}
 .td-axis{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;
   color:var(--muted);margin-top:9px;letter-spacing:.06em}
 .td-rank .rank-row .r-est{width:96px}
+.td-cats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.td-cats button{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);
+  border:1px solid var(--rule);background:var(--panel);border-radius:10px;padding:7px 15px;
+  cursor:pointer;transition:all .3s var(--ease);font-family:inherit}
+.td-cats button .tc-n{font-family:var(--mono);font-size:10.5px;color:var(--accent2);opacity:.85}
+.td-cats button:hover{color:var(--ink);border-color:rgba(109,94,252,.55);transform:translateY(-2px)}
+.td-cats button.on{color:#fff;background:linear-gradient(135deg,rgba(109,94,252,.32),rgba(34,211,238,.16));
+  border-color:var(--accent);box-shadow:0 8px 22px -10px rgba(109,94,252,.6);font-weight:700}
+.td-cats button.on .tc-n{color:#fff;opacity:1}
+.td-empty{padding:26px 16px;text-align:center;color:var(--muted);font-size:12.5px}
 
 /* ============ Topic Overlay ============ */
 .overlay{
@@ -520,6 +530,22 @@ main{position:fixed;inset:64px 0 0 0;z-index:1}
 .drop svg{width:40px;height:40px;margin-bottom:10px;stroke:var(--az);fill:none;stroke-width:1.6}
 .drop b{display:block;font-size:14.5px;margin-bottom:5px}
 .drop span{font-size:11.5px;color:var(--muted)}
+.drop-idle{display:flex;flex-direction:column;align-items:center}
+.drop-prev{position:relative;border-radius:10px;overflow:hidden;aspect-ratio:16/7;
+  background:#05070d;display:flex;flex-direction:column;justify-content:flex-end;
+  animation:riseIn .4s var(--ease) both}
+.drop-prev img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.9}
+.drop-prev::after{content:'';position:absolute;inset:0;
+  background:linear-gradient(to top,rgba(4,7,13,.92) 0%,rgba(4,7,13,.35) 45%,transparent 70%)}
+.dp-badge{position:absolute;top:9px;left:9px;z-index:2;font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.14em;color:#7ef3ff;background:rgba(4,18,26,.78);border:1px solid rgba(34,211,238,.5);
+  padding:3px 9px;border-radius:6px}
+.dp-meta{position:relative;z-index:2;padding:10px 13px 12px;text-align:left}
+.dp-meta b{display:block;font-size:13px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dp-meta span{font-family:var(--mono);font-size:10.5px;color:var(--accent2);letter-spacing:.05em}
+.dp-hint{position:absolute;top:9px;right:9px;z-index:2;font-size:10px;color:rgba(255,255,255,.65);
+  background:rgba(4,7,13,.6);padding:3px 8px;border-radius:6px;transition:opacity .3s}
+.drop:hover .dp-hint{opacity:.4}
 .az-run{margin-top:16px}
 .az-file{font-family:var(--mono);font-size:12px;color:var(--ink);margin-bottom:9px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -556,50 +582,110 @@ main{position:fixed;inset:64px 0 0 0;z-index:1}
 .az-report .rp span{font-size:10.5px;color:var(--muted)}
 [hidden]{display:none!important}
 
-/* jianying 动图教学 mock */
+/* jianying 动图教学 · 剪映专业版高保真模拟 */
 .jy-wrap{position:relative}
 .jy-locked{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:12px;background:rgba(7,11,20,.85);backdrop-filter:blur(6px);border-radius:14px;text-align:center;
   font-size:13px;color:var(--muted);line-height:1.8}
 .jy-locked b{color:var(--az);font-family:var(--mono);font-size:11.5px;letter-spacing:.14em}
-.jy-stage{position:relative;height:282px;border-radius:14px;overflow:hidden;
-  background:#0b0f1a;border:1px solid rgba(34,211,238,.25);display:flex;flex-direction:column;
-  font-size:10.5px;user-select:none}
-.jy-top{display:flex;align-items:center;gap:8px;padding:7px 10px;background:#121826;border-bottom:1px solid rgba(255,255,255,.08)}
-.jy-logo{font-weight:800;font-size:11px;color:#fff}
-.jy-logo span{font-weight:400;color:var(--muted);margin-left:4px}
-.jy-tab{padding:3px 9px;border-radius:6px;color:var(--muted);background:rgba(255,255,255,.05);
-  transition:all .3s;font-weight:600}
-.jy-tab.hi{background:rgba(34,211,238,.18);color:#7ef3ff;box-shadow:0 0 0 1px rgba(34,211,238,.55)}
-.jy-export{margin-left:auto;padding:4px 14px;border-radius:7px;background:linear-gradient(135deg,#17d4c1,#2ad0ff);
-  color:#04121a;font-weight:800;transition:all .3s;cursor:pointer}
-.jy-export.hi{box-shadow:0 0 18px rgba(42,208,255,.8);transform:scale(1.08)}
-.jy-body{flex:1;display:flex;gap:8px;padding:9px 10px;min-height:0}
-.jy-pool{width:30%;background:rgba(255,255,255,.04);border-radius:8px;padding:7px;display:flex;flex-direction:column;gap:6px}
-.jy-import{border:1px dashed rgba(34,211,238,.5);color:#7ef3ff;text-align:center;padding:7px;
-  border-radius:7px;transition:all .3s}
-.jy-import.hi{background:rgba(34,211,238,.16);box-shadow:0 0 14px rgba(34,211,238,.45)}
-.jy-thumb{height:26px;border-radius:5px;background:linear-gradient(120deg,rgba(109,94,252,.4),rgba(34,211,238,.3))}
-.jy-preview{flex:1;background:radial-gradient(ellipse at 50% 40%,#182136,#0a0e18);border-radius:8px;
-  display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.25);
-  font-family:var(--mono);letter-spacing:.2em;font-size:10px;border:1px solid rgba(255,255,255,.07);text-align:center}
-.jy-rpanel{width:27%;display:flex;flex-direction:column;gap:5px}
-.jy-ptab{padding:6px 8px;border-radius:7px;background:rgba(255,255,255,.045);color:var(--muted);
-  display:flex;align-items:center;justify-content:space-between;transition:all .3s}
-.jy-ptab em{font-style:normal;font-family:var(--mono);font-size:8.5px;color:var(--good);opacity:.45;transition:opacity .3s}
-.jy-ptab.hi{background:rgba(34,211,238,.15);color:#c9f8ff;box-shadow:0 0 0 1px rgba(34,211,238,.6)}
-.jy-ptab.hi em{opacity:1;text-shadow:0 0 8px var(--good)}
-.jy-timeline{height:76px;background:#10151f;border-top:1px solid rgba(255,255,255,.08);padding:9px 10px;
-  position:relative;transition:box-shadow .3s}
-.jy-timeline.hi{box-shadow:inset 0 0 0 1px var(--az)}
-.jy-track{height:20px;display:flex;gap:4px;margin-bottom:6px}
-.jy-clip{flex:1;border-radius:4px;background:linear-gradient(90deg,rgba(109,94,252,.55),rgba(109,94,252,.3));transition:all .3s}
-.jy-track.audio .jy-clip{background:linear-gradient(90deg,rgba(52,211,153,.5),rgba(52,211,153,.25))}
-.jy-track.text .jy-clip{background:linear-gradient(90deg,rgba(251,113,133,.5),rgba(251,113,133,.25))}
-.jy-timeline.hi .jy-clip{box-shadow:0 0 0 1.5px var(--az)}
-.jy-beat{position:absolute;top:11px;width:5px;height:5px;border-radius:50%;background:#ffd166;
+.jy-stage{position:relative;height:346px;border-radius:14px;overflow:hidden;
+  background:#18181b;border:1px solid rgba(255,255,255,.10);display:flex;flex-direction:column;
+  font-size:10.5px;user-select:none;color:#e5e7eb;
+  box-shadow:0 18px 50px -18px rgba(0,0,0,.7)}
+/* 顶部：菜单栏 */
+.jy-top{display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;background:#1d1d20;
+  border-bottom:1px solid rgba(255,255,255,.07);flex:none}
+.jy-logo{font-weight:800;font-size:11px;color:#fff;letter-spacing:.05em;padding-right:6px}
+.jy-menu{font-size:9.5px;color:#9ca3af;padding:3px 6px;border-radius:5px;transition:all .25s}
+.jy-menu:hover{background:rgba(255,255,255,.08);color:#fff}
+.jy-menu.hi{background:rgba(34,211,238,.16);color:#7ef3ff;box-shadow:0 0 0 1px rgba(34,211,238,.5)}
+.jy-time{margin-left:auto;font-family:var(--mono);font-size:9.5px;color:#6b7280;letter-spacing:.06em}
+/* 二级工具标签 */
+.jy-tabs{display:flex;gap:3px;height:30px;align-items:center;padding:0 10px;background:#1a1a1d;
+  border-bottom:1px solid rgba(255,255,255,.07);flex:none}
+.jy-tab{padding:4px 12px;border-radius:6px;color:#9ca3af;background:transparent;font-weight:500;
+  transition:all .3s;font-size:10.5px;cursor:default}
+.jy-tab:hover{color:#d1d5db;background:rgba(255,255,255,.06)}
+.jy-tab.hi{background:#05d9e8;color:#071014;font-weight:700;box-shadow:0 2px 10px rgba(5,217,232,.35)}
+.jy-export{margin-left:auto;padding:4px 16px;border-radius:6px;background:#05d9e8;
+  color:#071014;font-weight:800;font-size:10.5px;transition:all .3s;cursor:pointer}
+.jy-export.hi{box-shadow:0 0 18px rgba(5,217,232,.85);transform:scale(1.06);background:#4ff0fa}
+/* 主体三栏 */
+.jy-body{flex:1;display:flex;gap:7px;padding:8px;background:#141416;min-height:0}
+.jy-pool{width:31%;background:#1a1a1d;border:1px solid rgba(255,255,255,.06);border-radius:8px;
+  padding:7px;display:flex;flex-direction:column;gap:6px;min-height:0;overflow:hidden}
+.jy-import{border:1px dashed #05d9e8;color:#05d9e8;text-align:center;padding:8px 4px;
+  border-radius:7px;transition:all .3s;font-size:10px;background:rgba(5,217,232,.05)}
+.jy-import.hi{background:rgba(5,217,232,.18);box-shadow:0 0 14px rgba(5,217,232,.4);
+  border-style:solid;animation:spotPulse2 1.4s ease-out infinite}
+@keyframes spotPulse2{0%,100%{box-shadow:0 0 0 0 rgba(5,217,232,.45)}50%{box-shadow:0 0 14px 3px rgba(5,217,232,.55)}}
+.jy-thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.jy-thumb{position:relative;aspect-ratio:16/9;border-radius:4px;overflow:hidden;cursor:default;
+  background:linear-gradient(120deg,#3b3f52,#1f2331);transition:all .3s}
+.jy-thumb::after{content:attr(data-n);position:absolute;left:2px;bottom:1px;font-family:var(--mono);
+  font-size:7px;color:rgba(255,255,255,.75)}
+.jy-thumb .jt-dur{position:absolute;right:2px;bottom:1px;font-family:var(--mono);font-size:7px;
+  background:rgba(0,0,0,.72);color:#fff;padding:0 3px;border-radius:2px}
+.jy-thumb video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.jy-thumb.hi{outline:2px solid #05d9e8;outline-offset:1px;transform:scale(1.04)}
+.jy-pool-cap{font-size:8.5px;color:#6b7280;letter-spacing:.08em;font-family:var(--mono)}
+/* 预览监视器 */
+.jy-monitor{flex:1;background:#0b0b0d;border:1px solid rgba(255,255,255,.07);border-radius:8px;
+  display:flex;flex-direction:column;min-width:0;overflow:hidden;position:relative}
+.jy-screen{flex:1;position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 45%,#161b2a,#070a12);
+  display:flex;align-items:center;justify-content:center}
+.jy-screen video,.jy-screen img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.jy-screen .js-hint{position:relative;z-index:2;font-family:var(--mono);letter-spacing:.18em;
+  font-size:9.5px;color:rgba(255,255,255,.3);text-align:center;line-height:1.9}
+.jy-screen.hi{box-shadow:inset 0 0 0 2px #05d9e8}
+.jy-screen .js-sub{position:absolute;left:8%;right:8%;bottom:9%;z-index:3;text-align:center;
+  font-size:11px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 12px rgba(0,0,0,.6);
+  letter-spacing:.08em;opacity:0;transition:opacity .4s}
+.jy-screen .js-sub.on{opacity:1}
+.jy-ctrl{height:26px;display:flex;align-items:center;gap:8px;padding:0 9px;background:#1a1a1d;
+  border-top:1px solid rgba(255,255,255,.07);flex:none}
+.jy-play-btn{width:16px;height:16px;border-radius:50%;background:#05d9e8;display:flex;align-items:center;
+  justify-content:center;color:#071014;font-size:8px;font-weight:800}
+.jy-tcode{font-family:var(--mono);font-size:9px;color:#9ca3af;letter-spacing:.05em}
+.jy-tcode b{color:#05d9e8;font-weight:600}
+.jy-zoom{margin-left:auto;display:flex;gap:4px}
+.jy-zoom i{font-style:normal;color:#6b7280;font-size:8.5px;border:1px solid rgba(255,255,255,.12);
+  border-radius:3px;padding:1px 5px}
+/* 右侧属性面板 */
+.jy-rpanel{width:26%;display:flex;flex-direction:column;gap:4px;background:#1a1a1d;
+  border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:7px;overflow:hidden}
+.jy-rp-h{font-size:8.5px;color:#6b7280;letter-spacing:.1em;font-family:var(--mono);margin-bottom:1px}
+.jy-ptab{padding:7px 8px;border-radius:6px;background:#212124;color:#9ca3af;
+  display:flex;align-items:center;justify-content:space-between;transition:all .3s;
+  border-left:2px solid transparent}
+.jy-ptab em{font-style:normal;font-family:var(--mono);font-size:8px;color:var(--good);opacity:.4;transition:all .3s}
+.jy-ptab.hi{background:#05d9e8;color:#071014;font-weight:700;border-left-color:#071014;
+  box-shadow:0 3px 14px rgba(5,217,232,.35);transform:translateX(-3px)}
+.jy-ptab.hi em{opacity:1;color:#071014}
+/* 时间轴 */
+.jy-timeline{height:98px;background:#141416;border-top:1px solid rgba(255,255,255,.08);padding:7px 9px 8px;
+  position:relative;transition:box-shadow .3s;flex:none}
+.jy-timeline.hi{box-shadow:inset 0 0 0 1.5px #05d9e8}
+.jy-tl-ruler{height:10px;position:relative;margin-bottom:3px;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.16) 0 1px,transparent 1px 34px)}
+.jy-tl-ruler span{position:absolute;top:0;font-family:var(--mono);font-size:7px;color:#6b7280}
+.jy-track{height:17px;display:flex;gap:3px;margin-bottom:5px;position:relative}
+.jy-track::before{content:attr(data-l);position:absolute;left:-1px;top:1px;z-index:2;font-family:var(--mono);
+  font-size:7px;color:rgba(255,255,255,.6);background:rgba(0,0,0,.55);padding:0 3px;border-radius:2px}
+.jy-clip{flex:1;border-radius:3px;position:relative;overflow:hidden;transition:all .35s;
+  background:linear-gradient(90deg,#5b5fd6,#4747a8);
+  background-size:26px 100%;}
+.jy-clip::after{content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.12) 0 12px,rgba(255,255,255,0) 12px 26px)}
+.jy-track.audio .jy-clip{background:linear-gradient(90deg,#18a06a,#0f7a4f);background-size:8px 100%}
+.jy-track.audio .jy-clip::after{background:repeating-linear-gradient(90deg,rgba(255,255,255,.3) 0 2px,transparent 2px 6px)}
+.jy-track.text .jy-clip{background:linear-gradient(90deg,#d6507e,#a83266);background-size:auto}
+.jy-track.text .jy-clip::after{content:attr(data-t);inset:auto 4px 1px auto;background:none;
+  font-size:6.5px;color:rgba(255,255,255,.85)}
+.jy-timeline.hi .jy-clip{box-shadow:0 0 0 1.5px #05d9e8,0 0 12px rgba(5,217,232,.45)}
+.jy-beat{position:absolute;top:14px;z-index:3;width:5px;height:5px;border-radius:50%;background:#ffd166;
   box-shadow:0 0 8px #ffd166;animation:flicker 1.4s infinite}
-.jy-play{position:absolute;top:7px;bottom:7px;width:1.5px;background:#7ef3ff;box-shadow:0 0 8px #7ef3ff;
+.jy-play{position:absolute;top:14px;bottom:6px;width:1.5px;background:#05d9e8;box-shadow:0 0 8px #05d9e8;z-index:4;
   animation:playRun 5s linear infinite}
 @keyframes playRun{0%{left:9%}100%{left:91%}}
 .jy-cursor{position:absolute;z-index:6;width:15px;height:21px;pointer-events:none;left:42%;top:38%;
@@ -749,9 +835,20 @@ main{position:fixed;inset:64px 0 0 0;z-index:1}
           <p class="term-sub">支持拖入或点击选择本地视频文件，全流程仅在本地模拟，不上传</p>
 
           <div class="drop" id="azDrop" tabindex="0" role="button" aria-label="导入视频文件">
-            <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
-            <b>拖入视频文件，或点击导入</b>
-            <span>mp4 / mov / mkv · 本地解析 · 建议 &lt; 500MB</span>
+            <div class="drop-idle" id="dropIdle">
+              <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+              <b>拖入视频文件，或点击导入</b>
+              <span>mp4 / mov / mkv · 本地解析 · 建议 &lt; 500MB</span>
+            </div>
+            <div class="drop-prev" id="dropPrev" hidden>
+              <img id="dropCover" alt="视频封面帧">
+              <span class="dp-badge">LOCAL FRAME</span>
+              <div class="dp-meta">
+                <b id="dpName">—</b>
+                <span id="dpInfo">—</span>
+              </div>
+              <span class="dp-hint">点击可更换视频</span>
+            </div>
           </div>
           <input type="file" id="azFile" accept="video/*" hidden>
 
@@ -795,20 +892,47 @@ main{position:fixed;inset:64px 0 0 0;z-index:1}
             <div class="jy-stage" id="jyStage">
               <div class="jy-top">
                 <span class="jy-logo">剪映<span>专业版 · CapCut</span></span>
+                <span class="jy-menu" data-jy="m-file">文件</span>
+                <span class="jy-menu" data-jy="m-edit">编辑</span>
+                <span class="jy-menu" data-jy="m-new">新建</span>
+                <span class="jy-menu" data-jy="m-help">帮助</span>
+                <span class="jy-time">T&nbsp;00:00:00:00 · 30fps</span>
+              </div>
+              <div class="jy-tabs">
                 <span class="jy-tab hi" data-jy="tab-media">媒体</span>
                 <span class="jy-tab" data-jy="tab-audio">音频</span>
                 <span class="jy-tab" data-jy="tab-text">文本</span>
                 <span class="jy-tab" data-jy="tab-fx">特效</span>
+                <span class="jy-tab" data-jy="tab-tr">转场</span>
                 <span class="jy-export" data-jy="export">导出</span>
               </div>
               <div class="jy-body">
                 <div class="jy-pool">
                   <div class="jy-import hi" data-jy="import">+ 导入素材</div>
-                  <div class="jy-thumb" data-jy="thumb1"></div>
-                  <div class="jy-thumb" data-jy="thumb2"></div>
+                  <div class="jy-thumbs">
+                    <div class="jy-thumb" data-jy="thumb1" data-n="原片"><video id="jyThumbVid" muted loop playsinline></video><span class="jt-dur" id="jyThumbDur">00:15</span></div>
+                    <div class="jy-thumb" data-n="空镜"><span class="jt-dur">00:06</span></div>
+                    <div class="jy-thumb" data-n="BGM"><span class="jt-dur">00:15</span></div>
+                    <div class="jy-thumb" data-n="贴纸"><span class="jt-dur">PNG</span></div>
+                    <div class="jy-thumb" data-n="花字"><span class="jt-dur">TXT</span></div>
+                    <div class="jy-thumb" data-n="转场"><span class="jt-dur">FX</span></div>
+                  </div>
+                  <div class="jy-pool-cap">本地素材 · 6</div>
                 </div>
-                <div class="jy-preview" data-jy="preview">PREVIEW<br>00:00 / 00:15</div>
+                <div class="jy-monitor">
+                  <div class="jy-screen" data-jy="preview">
+                    <video id="jyPrev" muted loop playsinline></video>
+                    <span class="js-hint" id="jsHint">NO SIGNAL<br>导入视频后此处实时渲染画面</span>
+                    <span class="js-sub" id="jsSub"></span>
+                  </div>
+                  <div class="jy-ctrl">
+                    <span class="jy-play-btn">▶</span>
+                    <span class="jy-tcode"><b id="jyTc">00:00:00:00</b> / 00:00:15:00</span>
+                    <span class="jy-zoom"><i>适应</i><i>100%</i><i>▮▮▮</i></span>
+                  </div>
+                </div>
                 <div class="jy-rpanel">
+                  <div class="jy-rp-h">CLIP · 基础属性</div>
                   <div class="jy-ptab" data-jy="p-speed">变速<em>免费</em></div>
                   <div class="jy-ptab" data-jy="p-trans">转场<em>免费</em></div>
                   <div class="jy-ptab" data-jy="p-key">关键帧<em>免费</em></div>
@@ -816,9 +940,10 @@ main{position:fixed;inset:64px 0 0 0;z-index:1}
                 </div>
               </div>
               <div class="jy-timeline" data-jy="timeline">
-                <div class="jy-track"><span class="jy-clip"></span><span class="jy-clip"></span><span class="jy-clip"></span></div>
-                <div class="jy-track audio"><span class="jy-clip"></span><span class="jy-clip"></span></div>
-                <div class="jy-track text"><span class="jy-clip"></span></div>
+                <div class="jy-tl-ruler"><span style="left:9%">00:00</span><span style="left:34%">00:04</span><span style="left:59%">00:08</span><span style="left:84%">00:12</span></div>
+                <div class="jy-track" data-l="主视频"><span class="jy-clip"></span><span class="jy-clip"></span><span class="jy-clip"></span></div>
+                <div class="jy-track audio" data-l="音频"><span class="jy-clip"></span><span class="jy-clip"></span></div>
+                <div class="jy-track text" data-l="文本"><span class="jy-clip" data-t="花字标题"></span></div>
                 <span class="jy-beat" style="left:22%"></span>
                 <span class="jy-beat" style="left:48%"></span>
                 <span class="jy-beat" style="left:74%"></span>
@@ -849,6 +974,7 @@ main{position:fixed;inset:64px 0 0 0;z-index:1}
         <h2>当日热点</h2>
         <p id="tdUpdated">今日 · 跨平台实时聚合</p>
       </div>
+      <div class="td-cats stag" id="tdCats" role="tablist" aria-label="热点分区"></div>
       <div class="td-grid stag">
         <div class="sum-sec">
           <h3>今日热度 24 小时分布</h3>
