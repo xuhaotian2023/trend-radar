@@ -76,20 +76,122 @@
     line.geometry.computeBoundingSphere();
   }
 
-  /* ---------- 摄影师：火柴人 + 机身轮廓 ---------- */
+  /* ---------- 精细摄制装备：三轴云台 + 机身 + 镜头 + 监视屏 + 跟焦轮 ----------
+     结构（自下而上）：
+       手柄 grip → 偏航轴 yaw（水平旋转）→ 横滚轴 roll（左右倾斜）
+       → 俯仰轴 pitch（上下俯仰）→ 快装板 → 机身 → 镜头 → 遮光罩
+     三个轴各自成组，运行时按运镜需要独立转动，因此云台动作肉眼可见。 */
+  function makeRig(color) {
+    
+    var rig = new T.Group();
+
+    var metal = new T.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.72 });
+    var dark = new T.MeshBasicMaterial({ color: 0x2b3140, transparent: true, opacity: 0.9 });
+    var accent = new T.MeshBasicMaterial({ color: 0x7ef3ff, transparent: true, opacity: 0.85 });
+    var glass = new T.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.45 });
+
+    /* --- 手柄：摄影师握持处 --- */
+    var grip = new T.Mesh(new T.CylinderGeometry(0.026, 0.030, 0.20, 10), dark);
+    grip.position.y = -0.16;
+    rig.add(grip);
+
+    /* --- 偏航轴：立轴 + 轴心球（水平旋转的可见标志） --- */
+    var yawGrp = new T.Group();
+    var yawPost = new T.Mesh(new T.CylinderGeometry(0.020, 0.020, 0.10, 8), metal);
+    yawPost.position.y = -0.06;
+    yawGrp.add(yawPost);
+    var yawBall = new T.Mesh(new T.SphereGeometry(0.032, 10, 8), dark);
+    yawGrp.add(yawBall);
+    rig.add(yawGrp);
+
+    /* --- 横滚轴：横臂 + 两侧电机（左右倾斜） --- */
+    var rollGrp = new T.Group();
+    rollGrp.position.y = 0.035;
+    var rollArm = new T.Mesh(new T.BoxGeometry(0.24, 0.022, 0.022), metal);
+    rollGrp.add(rollArm);
+    [-0.12, 0.12].forEach(function (x) {
+      var motor = new T.Mesh(new T.CylinderGeometry(0.030, 0.030, 0.034, 12), dark);
+      motor.rotation.z = Math.PI / 2;
+      motor.position.x = x;
+      rollGrp.add(motor);
+      /* 电机端盖上的青色环，让轴心转动时更醒目 */
+      var ring = new T.Mesh(new T.TorusGeometry(0.030, 0.004, 6, 14), accent);
+      ring.rotation.y = Math.PI / 2;
+      ring.position.x = x + (x < 0 ? -0.018 : 0.018);
+      rollGrp.add(ring);
+    });
+    yawGrp.add(rollGrp);
+
+    /* --- 俯仰轴：竖臂 + 相机托架（上下俯仰） --- */
+    var pitchGrp = new T.Group();
+    pitchGrp.position.y = 0.032;
+    var pitchArm = new T.Mesh(new T.BoxGeometry(0.022, 0.13, 0.022), metal);
+    pitchArm.position.y = 0.055;
+    pitchGrp.add(pitchArm);
+    var pitchBall = new T.Mesh(new T.SphereGeometry(0.022, 10, 8), dark);
+    pitchBall.position.y = 0.115;
+    pitchGrp.add(pitchBall);
+    rollGrp.add(pitchGrp);
+
+    /* --- 快装板 + 机身 --- */
+    var body = new T.Group();
+    body.position.y = 0.128;
+    var plate = new T.Mesh(new T.BoxGeometry(0.13, 0.012, 0.17), dark);
+    plate.position.y = -0.012;
+    body.add(plate);
+    var camBody = new T.Mesh(new T.BoxGeometry(0.155, 0.115, 0.20), metal);
+    body.add(camBody);
+    /* 顶部热靴 + 提手 */
+    var hotShoe = new T.Mesh(new T.BoxGeometry(0.10, 0.014, 0.06), dark);
+    hotShoe.position.y = 0.064;
+    body.add(hotShoe);
+    /* 翻转屏：机身背面的一块亮面，随云台一起转，能看出朝向 */
+    var screen = new T.Mesh(new T.PlaneGeometry(0.105, 0.075), glass);
+    screen.position.set(0, 0.004, 0.103);
+    screen.rotation.y = Math.PI;
+    body.add(screen);
+    /* 机身顶部的录制指示灯 */
+    var rec = new T.Mesh(new T.SphereGeometry(0.010, 8, 6), new T.MeshBasicMaterial({ color: 0xfb7185 }));
+    rec.position.set(0.058, 0.052, -0.055);
+    body.add(rec);
+    /* 镜头：镜筒 + 变焦环 + 遮光罩 */
+    var lensBarrel = new T.Mesh(new T.CylinderGeometry(0.042, 0.046, 0.135, 16), dark);
+    lensBarrel.rotation.x = Math.PI / 2;
+    lensBarrel.position.z = -0.165;
+    body.add(lensBarrel);
+    var zoomRing = new T.Mesh(new T.CylinderGeometry(0.049, 0.049, 0.022, 16), accent);
+    zoomRing.rotation.x = Math.PI / 2;
+    zoomRing.position.z = -0.145;
+    body.add(zoomRing);
+    var lensGlass = new T.Mesh(new T.CylinderGeometry(0.038, 0.038, 0.008, 16), glass);
+    lensGlass.rotation.x = Math.PI / 2;
+    lensGlass.position.z = -0.234;
+    body.add(lensGlass);
+    var hood = new T.Mesh(new T.CylinderGeometry(0.055, 0.046, 0.05, 16, 1, true), dark);
+    hood.rotation.x = Math.PI / 2;
+    hood.position.z = -0.246;
+    body.add(hood);
+    /* 跟焦轮：机身右侧的小圆盘，转动可见 */
+    var ffWheel = new T.Mesh(new T.CylinderGeometry(0.030, 0.030, 0.014, 14), accent);
+    ffWheel.rotation.z = Math.PI / 2;
+    ffWheel.position.set(0.086, -0.028, 0.020);
+    body.add(ffWheel);
+    pitchGrp.add(body);
+
+    /* 各轴引用，供运行时驱动 */
+    rig.userData = {
+      yawGrp: yawGrp, rollGrp: rollGrp, pitchGrp: pitchGrp,
+      body: body, ffWheel: ffWheel, lens: lensBarrel,
+      zoomRing: zoomRing, screen: screen, rec: rec
+    };
+    return rig;
+  }
+
+  /* ---------- 摄影师：火柴人 + 精细摄制装备 ---------- */
   function makeShooter(color) {
     var g = makeStick(color, { scale: 1.0 });
-    var d = g.userData;
-    /* 机身：一个朝前的扁盒子 */
-    var bodyMat = new T.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.55 });
-    var cam = new T.Mesh(new T.BoxGeometry(0.18, 0.13, 0.24), bodyMat);
     var camGrp = new T.Group();
-    camGrp.add(cam);
-    /* 镜头筒 */
-    var lens = new T.Mesh(new T.CylinderGeometry(0.045, 0.05, 0.12, 12), bodyMat);
-    lens.rotation.x = Math.PI / 2;
-    lens.position.z = -0.16;
-    camGrp.add(lens);
+    camGrp.add(makeRig(color));
     g.add(camGrp);
     g.userData.camGrp = camGrp;
     return g;
@@ -175,9 +277,10 @@
 
   /* ---------- 地面 ---------- */
   function makeFloor(scene) {
+    var grp = new T.Group();
     var grid = new T.GridHelper(12, 24, 0x2a3550, 0x1a2136);
     grid.position.y = 0;
-    scene.add(grid);
+    grp.add(grid);
     /* 地面薄板，给火柴人一个落脚感 */
     var plate = new T.Mesh(
       new T.PlaneGeometry(12, 12),
@@ -185,7 +288,11 @@
     );
     plate.rotation.x = -Math.PI / 2;
     plate.position.y = -0.002;
-    scene.add(plate);
+    grp.add(plate);
+    scene.add(grp);
+    grp.userData.grid = grid;
+    grp.userData.plate = plate;
+    return grp;
   }
 
   /* ---------- 主类 ---------- */
@@ -215,6 +322,9 @@
       this.renderer.domElement.style.height = '100%';
       this.renderer.domElement.style.cursor = 'grab';
       this.renderer.domElement.style.touchAction = 'none';
+      /* 允许接收键盘焦点，配合自由飞行模式的 WASD */
+      this.renderer.domElement.tabIndex = 0;
+      this.renderer.domElement.style.outline = 'none';
 
       this.scene = new T.Scene();
       this.camera = new T.PerspectiveCamera(46, 1, 0.1, 200);
@@ -226,7 +336,11 @@
       this._applyOrbit();
 
       this.clock = new T.Clock();
-      makeFloor(this.scene);
+      this.floorGrid = makeFloor(this.scene);
+
+      /* 场景环境：按拍摄场景搭出对应空间（房间窗边 / 夜景街头 / 天台…）。
+         环境作为独立 Group 挂载，切换场景时只替换这一组，火柴人与轨迹不受影响。 */
+      this.envGroup = null;
 
       /* 演员（被拍对象） */
       this.actor = makeStick(0x7ef3ff, { scale: 1.0 });
@@ -237,7 +351,7 @@
       this.shooter = makeShooter(0xffb75e);
       this.scene.add(this.shooter);
 
-      /* 视锥挂在摄影师上 */
+      /* 视锥挂在摄影师的装备上 */
       this.frustum = makeFrustum(0x6d5efc);
       this.shooter.userData.camGrp.add(this.frustum);
 
@@ -281,7 +395,9 @@
   };
 
   Stage.prototype._applyOrbit = function () {
-    var r = this.sph.r * (this._fit || 1), th = this.sph.theta, ph = this.sph.phi;
+    /* 装备特写是"凑近看细节"，不能再按画幅比例放大半径，否则永远拉不近 */
+    var fit = this._orbitFollowGear ? 1 : (this._fit || 1);
+    var r = this.sph.r * fit, th = this.sph.theta, ph = this.sph.phi;
     this.camera.position.set(
       this.target.x + r * Math.sin(ph) * Math.sin(th),
       this.target.y + r * Math.cos(ph),
@@ -297,13 +413,24 @@
       e.preventDefault();
       el.setPointerCapture && el.setPointerCapture(e.pointerId);
       drag = { x: e.clientX, y: e.clientY, btn: e.button, theta: self.sph.theta, phi: self.sph.phi,
-               px: self.camera.position.x, py: self.camera.position.y, pz: self.camera.position.z };
+               yaw: (self._fly && self._fly.yaw) || 0, pitch: (self._fly && self._fly.pitch) || 0 };
       el.style.cursor = 'grabbing';
+      try { el.focus(); } catch (err) {}
     });
     el.addEventListener('pointermove', function (e) {
       if (!drag) return;
       var dx = (e.clientX - drag.x) / Math.max(1, el.clientWidth);
       var dy = (e.clientY - drag.y) / Math.max(1, el.clientHeight);
+
+      if (self.camMode === 'fly') {
+        /* 自由飞行：拖拽直接改朝向（像在第一人称里转头） */
+        var f = self._fly || (self._fly = { v: new T.Vector3(), yaw: drag.yaw, pitch: drag.pitch, keys: {} });
+        f.yaw = drag.yaw - dx * Math.PI * 1.6;
+        f.pitch = Math.max(-1.35, Math.min(1.35, drag.pitch - dy * Math.PI * 1.1));
+        return;
+      }
+      if (self.camMode === 'follow') return;   // 跟机视角由摄影师驱动，不响应拖拽
+
       if (drag.btn === 2) {
         /* 右键平移：沿相机右向量与上向量移动目标点 */
         var right = new T.Vector3().setFromMatrixColumn(self.camera.matrix, 0);
@@ -323,11 +450,33 @@
     });
     el.addEventListener('wheel', function (e) {
       e.preventDefault();
-      self.sph.r = Math.min(18, Math.max(1.6, self.sph.r * (1 + (e.deltaY > 0 ? 0.12 : -0.12))));
-      self._applyOrbit();
+      self.nudgeDist(1 + (e.deltaY > 0 ? 0.12 : -0.12));
     }, { passive: false });
     /* 屏蔽右键菜单以便右键平移 */
     el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+    /* 键盘：自由飞行模式下用 WASD / 方向键 / Q E 在空间里移动。
+       监听挂在 window 上，但只在"自由飞行 + 画布在视口内"时生效，避免抢页面快捷键。 */
+    function inView() {
+      var r = el.getBoundingClientRect();
+      return r.bottom > 0 && r.top < (window.innerHeight || 0) && r.width > 0;
+    }
+    window.addEventListener('keydown', function (e) {
+      if (self.camMode !== 'fly' || !inView()) return;
+      var k = String(e.key || '').toLowerCase();
+      if (['w', 'a', 's', 'd', 'q', 'e', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].indexOf(k) >= 0) {
+        self.flyKey(k, true);
+        e.preventDefault();
+      }
+    });
+    window.addEventListener('keyup', function (e) {
+      var k = String(e.key || '').toLowerCase();
+      self.flyKey(k, false);
+    });
+    /* 失焦时清空按键，避免"按键卡住"导致相机一直飘 */
+    window.addEventListener('blur', function () {
+      if (self._fly && self._fly.keys) self._fly.keys = {};
+    });
   };
 
   Stage.prototype.setOrbit = function (preset) {
@@ -336,12 +485,84 @@
       'top': { r: 8.2, theta: 0, phi: 0.14, ty: 0.0, tz: 1.1 },
       'front': { r: 6.6, theta: 0, phi: Math.PI * 0.44, ty: 0.85, tz: 1.0 },
       'side': { r: 6.6, theta: Math.PI * 0.5, phi: Math.PI * 0.44, ty: 0.85, tz: 1.0 },
-      'close': { r: 4.4, theta: Math.PI * 0.22, phi: Math.PI * 0.38, ty: 0.95, tz: 0.9 }
+      'close': { r: 5.6, theta: Math.PI * 0.30, phi: Math.PI * 0.40, ty: 0.95, tz: 1.5 },
+      /* 装备特写：贴近摄影师，专门看清云台三轴与机身细节 */
+      'gear': { r: 2.35, theta: Math.PI * 0.44, phi: Math.PI * 0.47, ty: 1.15, tz: 0, followGear: true }
     }[preset] || null;
     if (!P) return;
+    /* 切回环绕视角时退出跟机 / 自由飞行模式 */
+    this.camMode = 'orbit';
     this.sph.r = P.r; this.sph.theta = P.theta; this.sph.phi = P.phi;
+    /* 装备特写：目标点跟着摄影师走，便于观察云台动作 */
+    this._orbitFollowGear = !!P.followGear;
     this.target.set(0, P.ty, P.tz == null ? 1.1 : P.tz);
+    if (P.followGear && this.shooter) {
+      var cg2 = this.shooter.userData.camGrp;
+      var wp2 = new T.Vector3();
+      cg2.getWorldPosition(wp2);
+      this.target.copy(wp2);
+    }
     this._applyOrbit();
+  };
+
+  /* ---------- 观察模式 ----------
+     orbit : 环绕观察（默认，绕场景中心旋转）
+     follow: 跟机视角——把观察相机贴到摄影师身上，看到的就是"摄影师拍到什么"
+     fly   : 自由飞行——脱离轨道，用键盘/WASD 或拖拽在空间里自由移动
+     三种模式共用同一台相机，切换时只改驱动方式。 */
+  Stage.prototype.setCamMode = function (mode) {
+    if (!this.ok) return;
+    if (mode !== 'orbit' && mode !== 'follow' && mode !== 'fly') return;
+    var prev = this.camMode || 'orbit';
+    this.camMode = mode;
+    if (mode === 'orbit' && prev !== 'orbit') {
+      /* 从其它模式回到环绕：以当前位置反推球坐标，避免视角突变 */
+      this._syncSphFromCamera();
+    }
+    if (mode === 'fly' && prev !== 'fly') {
+      this._fly = this._fly || { v: new T.Vector3(), yaw: 0, pitch: 0, keys: {} };
+      /* 用当前朝向初始化飞行方向 */
+      var dir = new T.Vector3();
+      this.camera.getWorldDirection(dir);
+      this._fly.yaw = Math.atan2(-dir.x, -dir.z);
+      this._fly.pitch = Math.asin(Math.max(-1, Math.min(1, dir.y)));
+    }
+  };
+
+  /* 由当前相机位置反推球坐标（保持视觉连续） */
+  Stage.prototype._syncSphFromCamera = function () {
+    var off = new T.Vector3().subVectors(this.camera.position, this.target);
+    var r = off.length() || 7;
+    this.sph.r = r;
+    this.sph.phi = Math.acos(Math.max(-1, Math.min(1, off.y / r)));
+    this.sph.theta = Math.atan2(off.x, off.z);
+  };
+
+  /* 手动微调自由视角的朝向（键盘方向键 / 拖拽都会走这里） */
+  Stage.prototype.nudgeView = function (dTheta, dPhi) {
+    if (this.camMode === 'fly') {
+      var f = this._fly; if (!f) return;
+      f.yaw += dTheta; f.pitch = Math.max(-1.35, Math.min(1.35, f.pitch + dPhi));
+      return;
+    }
+    this.sph.theta += dTheta;
+    this.sph.phi = Math.min(Math.PI * 0.92, Math.max(Math.PI * 0.06, this.sph.phi + dPhi));
+    this._applyOrbit();
+  };
+  Stage.prototype.nudgeDist = function (factor) {
+    if (this.camMode === 'fly') {
+      var f = this._fly; if (!f) return;
+      f.v.z = (f.v.z || 0);   // 飞行模式下滚轮改为前后推进
+      f._push = (f._push || 0) + (factor > 1 ? -0.5 : 0.5);
+      return;
+    }
+    this.sph.r = Math.min(18, Math.max(1.6, this.sph.r * factor));
+    this._applyOrbit();
+  };
+  /* 自由飞行模式：按方向键/WASD 平移 */
+  Stage.prototype.flyKey = function (key, down) {
+    if (!this._fly) this._fly = { v: new T.Vector3(), yaw: 0, pitch: 0, keys: {} };
+    this._fly.keys[key] = !!down;
   };
 
   Stage.prototype._resize = function () {
@@ -373,6 +594,45 @@
       requestAnimationFrame(attempt);
     })();
   };
+
+  /* ---------- 场景环境切换 ----------
+     按场景 id 搭出对应空间。同一 id 不重复重建；切到新场景时销毁旧的释放显存。
+     环境自带的灯架 / 柔光箱等已经表达光线来向，因此场景内不再额外打灯。 */
+  Stage.prototype.setEnvironment = function (sceneId) {
+    if (!this.ok || !window.GS_ENV) return false;
+    var id = sceneId || 'generic';
+    if (this._envId === id && this.envGroup) return true;
+
+    /* 移除旧环境 */
+    if (this.envGroup) {
+      this.scene.remove(this.envGroup);
+      this.envGroup.traverse(function (o) {
+        if (o.geometry) { try { o.geometry.dispose(); } catch (e) {} }
+        if (o.material) {
+          var ms = Array.isArray(o.material) ? o.material : [o.material];
+          ms.forEach(function (m) { try { m.dispose(); } catch (e) {} });
+        }
+      });
+      this.envGroup = null;
+    }
+
+    var env = window.GS_ENV.create(id);
+    if (!env || !env.group) { this._envId = null; return false; }
+    this.envGroup = env.group;
+    this.scene.add(this.envGroup);
+    this._envId = id;
+    this._envInfo = { light: env.light, id: id };
+
+    /* 场景自带来光线语义时隐藏通用网格，避免与场景地板打架 */
+    if (this.floorGrid) {
+      var showGrid = env.ground !== false;
+      this.floorGrid.userData.grid.visible = showGrid;
+      this.floorGrid.userData.plate.visible = showGrid;
+    }
+    this._update(0, true);
+    return true;
+  };
+  Stage.prototype.envInfo = function () { return this._envInfo || { light: '', id: '' }; };
 
   /* ---------- 动作：按手法 id 生成"演员 + 摄影师"的走位与镜头运动 ---------- */
   Stage.prototype.setMove = function (moveId, opts) {
@@ -491,19 +751,45 @@
     this.shooter.rotation.y = st.C.yaw;
 
     /* 走路摆臂：按进度做正弦摆动，让火柴人不是"滑行" */
-    var swing = Math.sin(this.t * 7) * 0.16 * (this.playing ? 1 : 0);
+    var moving = this.playing ? 1 : 0;
     var a = this.actor.userData, sh = this.shooter.userData;
-    poseLimb(a.legL, new T.Vector3(0, a.hipY, 0), new T.Vector3(-0.16 + swing * 0.8, 0, swing));
-    poseLimb(a.legR, new T.Vector3(0, a.hipY, 0), new T.Vector3(0.16 - swing * 0.8, 0, -swing));
-    poseLimb(a.armL, new T.Vector3(0, a.shoulderY, 0), new T.Vector3(-0.30, 0.98, -swing * 0.9));
-    poseLimb(a.armR, new T.Vector3(0, a.shoulderY, 0), new T.Vector3(0.30, 0.98, swing * 0.9));
 
-    /* 摄影师双臂抬起做持机姿势 */
-    poseLimb(sh.armL, new T.Vector3(0, sh.shoulderY, 0), new T.Vector3(-0.16, 1.24, 0.22));
-    poseLimb(sh.armR, new T.Vector3(0, sh.shoulderY, 0), new T.Vector3(0.16, 1.24, 0.22));
-    var sw2 = Math.sin(this.t * 6.2) * 0.06 * (this.playing ? 1 : 0);
-    poseLimb(sh.legL, new T.Vector3(0, sh.hipY, 0), new T.Vector3(-0.12, 0, sw2));
-    poseLimb(sh.legR, new T.Vector3(0, sh.hipY, 0), new T.Vector3(0.12, 0, -sw2));
+    /* ---- 演员动作：由当前手法决定"演什么" ---- */
+    var perf = this._actorPerf(p, moving);
+    poseLimb(a.legL, new T.Vector3(0, a.hipY, 0), perf.legL);
+    poseLimb(a.legR, new T.Vector3(0, a.hipY, 0), perf.legR);
+    poseLimb(a.armL, new T.Vector3(0, a.shoulderY, 0), perf.armL);
+    poseLimb(a.armR, new T.Vector3(0, a.shoulderY, 0), perf.armR);
+    /* 躯干整体起伏：走路时上下颠簸，让动作有重量感 */
+    this.actor.position.y = perf.bob;
+    /* 转身/侧身：围绕手法需要做细微身体转动 */
+    this.actor.rotation.y = st.A.face + perf.lean;
+
+    /* ---- 摄影师：持机姿态 + 步伐 ---- */
+    var sp = this._shooterPerf(p, moving);
+    poseLimb(sh.armL, new T.Vector3(0, sh.shoulderY, 0), sp.armL);
+    poseLimb(sh.armR, new T.Vector3(0, sh.shoulderY, 0), sp.armR);
+    poseLimb(sh.legL, new T.Vector3(0, sh.hipY, 0), sp.legL);
+    poseLimb(sh.legR, new T.Vector3(0, sh.hipY, 0), sp.legR);
+    this.shooter.position.y = sp.bob;
+
+    /* ---- 云台三轴：按运镜需要独立转动，让云台动作肉眼可见 ---- */
+    var rigU = null;
+    if (cg.children.length) rigU = cg.children[0].userData;
+    if (rigU) {
+      /* 偏航轴：甩镜时大幅转动，其余跟随机身朝向做微调 */
+      rigU.yawGrp.rotation.y = sp.yaw;
+      /* 横滚轴：环绕/跟随时机身微倾，制造运动感 */
+      rigU.rollGrp.rotation.z = sp.roll;
+      /* 俯仰轴：升高时下俯、低角度时上仰 */
+      rigU.pitchGrp.rotation.x = sp.pitch;
+      /* 跟焦轮随焦点变化转动 */
+      rigU.ffWheel.rotation.x = this.t * (this.playing ? 1.6 : 0);
+      /* 录制指示灯呼吸 */
+      if (rigU.rec) {
+        rigU.rec.visible = this.playing ? (Math.sin(this.t * 6) > -0.2) : false;
+      }
+    }
 
     /* 轨迹：把已走过的路径画出来 */
     if (force || this.playing) {
@@ -520,7 +806,70 @@
     }
 
     this.lastState = st;
+
+    /* ---- 相机模式驱动 ---- */
+    this._driveCamera(dt);
+
     this.renderer.render(this.scene, this.camera);
+  };
+
+  /* 按当前模式摆放观察相机 */
+  Stage.prototype._driveCamera = function (dt) {
+    var mode = this.camMode || 'orbit';
+
+    if (mode === 'follow') {
+      /* 跟机视角：相机放到镜头前方一点（而不是机身中心），
+         否则会从火柴人躯干内部往外看，画面被自己的身体挡住、看不出构图。 */
+      var cg = this.shooter.userData.camGrp;
+      var wp = new T.Vector3();
+      cg.getWorldPosition(wp);
+      var quat = cg.getWorldQuaternion(new T.Quaternion());
+      var dir = new T.Vector3(0, 0, -1).applyQuaternion(quat);
+      /* 沿镜头朝向前移 0.30m（越过机身与镜筒），并略微上抬到取景眼位 */
+      var pos = wp.clone().addScaledVector(dir, 0.30);
+      pos.y += 0.04;
+      this.camera.position.copy(pos);
+      var look = pos.clone().addScaledVector(dir, 3.0);
+      this.camera.lookAt(look.x, look.y, look.z);
+      return;
+    }
+
+    if (mode === 'fly') {
+      /* 自由飞行：方向键/WASD 平移 + 拖拽转向，完全脱离轨道 */
+      var f = this._fly || (this._fly = { v: new T.Vector3(), yaw: 0, pitch: 0, keys: {}, _push: 0 });
+      var speed = 3.4 * Math.max(0.016, Math.min(dt || 0.016, 0.05)) * 60 / 60;
+      var fwd = new T.Vector3(-Math.sin(f.yaw), 0, -Math.cos(f.yaw));
+      var right = new T.Vector3(Math.cos(f.yaw), 0, -Math.sin(f.yaw));
+      var mv = new T.Vector3();
+      var k = f.keys || {};
+      if (k.w || k.arrowup) mv.add(fwd);
+      if (k.s || k.arrowdown) mv.sub(fwd);
+      if (k.a || k.arrowleft) mv.sub(right);
+      if (k.d || k.arrowright) mv.add(right);
+      if (k.q) mv.y -= 1;
+      if (k.e) mv.y += 1;
+      if (mv.lengthSq() > 0) mv.normalize().multiplyScalar(speed);
+      /* 滚轮推进 */
+      if (f._push) { mv.addScaledVector(fwd, f._push * 0.35); f._push = 0; }
+      this.camera.position.add(mv);
+      /* 俯仰影响视线高度但不改变前进方向（保持地面平行，避免眩晕） */
+      var look = new T.Vector3(
+        this.camera.position.x - Math.sin(f.yaw) * Math.cos(f.pitch),
+        this.camera.position.y + Math.sin(f.pitch),
+        this.camera.position.z - Math.cos(f.yaw) * Math.cos(f.pitch)
+      );
+      this.camera.lookAt(look);
+      return;
+    }
+
+    /* orbit：由 _applyOrbit 负责，拖拽时实时更新。
+       装备特写模式下目标点持续跟随摄影师，镜头跟着云台一起走。 */
+    if (this._orbitFollowGear && this.shooter) {
+      var wp3 = new T.Vector3();
+      this.shooter.userData.camGrp.getWorldPosition(wp3);
+      this.target.copy(wp3);
+      this._applyOrbit();
+    }
   };
 
   Stage.prototype.play = function () {
@@ -544,6 +893,167 @@
     this.t = Math.max(0, Math.min(1, p)) * this.dur;
     this._update(0);
   };
+  /* ---------- 演员演技：按手法生成四肢端点与身体起伏 ----------
+     所有端点都是相对躯干原点的局部坐标（与 makeStick 的关节高度统一）。
+     走路用反相正弦驱动四肢；不同手法叠加各自的"表演"（抬手、转身、定格等）。 */
+  Stage.prototype._actorPerf = function (p, moving) {
+    var a = this.actor.userData;
+    var hipY = a.hipY, shY = a.shoulderY;
+    var m = this.mode;
+    /* 步频：走位越快的镜头，步频越高 */
+    var cadence = (m === 'follow' || m === 'whip') ? 8.2 : (m === 'orbit' || m === 'crane') ? 5.4 : 6.4;
+    var ph = this.t * cadence;
+    var A = moving ? 1 : 0;
+
+    /* 腿：反相摆动，幅度随步频 */
+    var legSwing = Math.sin(ph) * 0.30 * A;
+    var legLift = Math.max(0, Math.sin(ph)) * 0.10 * A;
+    var legL = new T.Vector3(-0.15 - legSwing * 0.35, legLift, legSwing);
+    var legR = new T.Vector3(0.15 + legSwing * 0.35, Math.max(0, -Math.sin(ph)) * 0.10 * A, -legSwing);
+
+    /* 手臂：与腿反相，幅度略小 */
+    var armSwing = Math.sin(ph + Math.PI) * 0.26 * A;
+    var armL = new T.Vector3(-0.30, 0.98, armSwing);
+    var armR = new T.Vector3(0.30, 0.98, -armSwing);
+
+    /* 身体起伏：双脚交替支撑带来的上下颠簸 */
+    var bob = Math.abs(Math.sin(ph)) * 0.035 * A;
+
+    var lean = 0;
+
+    /* ---- 各手法的专属表演 ---- */
+    if (m === 'orbit') {
+      /* 环绕：演员基本站定做展示动作，双手略微抬起（展示产品/自我） */
+      armL.set(-0.30, 1.02 + Math.sin(ph * 0.5) * 0.05, 0.10);
+      armR.set(0.30, 1.06 + Math.sin(ph * 0.5 + 1) * 0.05, 0.12);
+      lean = Math.sin(ph * 0.4) * 0.10;
+      bob = Math.abs(Math.sin(ph * 0.6)) * 0.012 * A;
+    } else if (m === 'dolly') {
+      /* 推拉：演员多半在"表演情绪"，手臂自然摆动幅度小 */
+      armSwing = Math.sin(ph + Math.PI) * 0.14 * A;
+      armL.set(-0.30, 0.98, armSwing);
+      armR.set(0.30, 0.98, -armSwing);
+      lean = Math.sin(this.t * 1.1) * 0.05;
+    } else if (m === 'follow') {
+      /* 跟随：演员正常行走，手臂摆动最大 */
+      armSwing = Math.sin(ph + Math.PI) * 0.34 * A;
+      armL.set(-0.30, 0.98, armSwing);
+      armR.set(0.30, 0.98, -armSwing);
+      lean = 0.06 * A;
+    } else if (m === 'crane') {
+      /* 升高：演员站定，双臂自然下垂后随镜头升高微微张开 */
+      var open = Math.min(1, p * 1.6);
+      armL.set(-0.30 - open * 0.16, 0.98 - open * 0.10, 0.02);
+      armR.set(0.30 + open * 0.16, 0.98 - open * 0.10, 0.02);
+      legL.set(-0.17, 0, 0); legR.set(0.17, 0, 0);
+      bob = 0.01 * A;
+    } else if (m === 'ramp') {
+      /* 变速：动作峰值处做一次发力的定格——手臂前挥后骤停 */
+      var peak = p > 0.42 && p < 0.62;
+      var drive = Math.min(1, p / 0.45);
+      if (peak) {
+        /* 停格姿态：前臂抬起、身体前倾 */
+        armL.set(-0.26, 1.16, -0.22);
+        armR.set(0.26, 1.18, -0.26);
+        legL.set(-0.22, 0.02, 0.20);
+        legR.set(0.18, 0, -0.14);
+        lean = 0.18;
+        bob = 0.02;
+      } else if (p < 0.42) {
+        /* 蓄力：手臂后摆 */
+        armL.set(-0.30, 0.98 - drive * 0.06, 0.30 * drive);
+        armR.set(0.30, 0.98 - drive * 0.06, 0.30 * drive);
+        lean = -0.08 * drive;
+      }
+    } else if (m === 'whip') {
+      /* 甩镜：演员做一个快速转身/挥手，配合镜头甩动 */
+      var turn = p < 0.5 ? p * 2 : 1;
+      armL.set(-0.30 - 0.20 * turn, 1.02 + 0.10 * turn, 0.10 * turn);
+      armR.set(0.30, 0.98, 0);
+      lean = -0.30 * Math.sin(p * Math.PI);
+    } else if (m === 'dutch') {
+      /* 荷兰角：演员略显不安，手臂夹紧、重心偏移 */
+      armL.set(-0.22, 1.00, 0.06);
+      armR.set(0.22, 1.00, -0.06);
+      legL.set(-0.13, 0, 0.04);
+      legR.set(0.19, 0, -0.03);
+      lean = Math.sin(this.t * 2.2) * 0.08;
+      bob = 0.008 * A;
+    } else if (m === 'neon' || m === 'frame' || m === 'static' || m === 'lightleak') {
+      /* 静态塑形类：演员轻微呼吸感，不做大动作 */
+      var breathe = Math.sin(this.t * 1.8) * 0.02;
+      armL.set(-0.29, 0.99 + breathe, 0.04);
+      armR.set(0.29, 0.99 + breathe, -0.04);
+      legL.set(-0.16, 0, 0.02); legR.set(0.16, 0, -0.02);
+      lean = Math.sin(this.t * 0.9) * 0.04;
+      bob = 0.006 * A;
+    }
+
+    return { legL: legL, legR: legR, armL: armL, armR: armR, bob: bob, lean: lean };
+  };
+
+  /* ---------- 摄影师动作：持机步态 + 云台三轴 ---------- */
+  Stage.prototype._shooterPerf = function (p, moving) {
+    var sh = this.shooter.userData;
+    var shY = sh.shoulderY, hipY = sh.hipY;
+    var m = this.mode;
+    var A = moving ? 1 : 0;
+    /* 摄影师的步伐比演员更小更稳（要保证画面不抖） */
+    var cadence = (m === 'follow' || m === 'whip') ? 7.0 : (m === 'orbit' ? 5.2 : 6.0);
+    var ph = this.t * cadence;
+    var swing = Math.sin(ph) * 0.14 * A;
+    var bob = Math.abs(Math.sin(ph)) * 0.018 * A;
+
+    var legL = new T.Vector3(-0.12 - swing * 0.4, Math.max(0, Math.sin(ph)) * 0.05 * A, swing);
+    var legR = new T.Vector3(0.12 + swing * 0.4, Math.max(0, -Math.sin(ph)) * 0.05 * A, -swing);
+
+    /* 双臂举起持机：双手位置随手法调整（胸前 / 举高 / 贴眼） */
+    var armUp = 1.22, armFwd = 0.20;
+    if (m === 'crane') { armUp = 1.30; armFwd = 0.16; }        // 举高
+    if (m === 'low-angle-hero' || m === 'static') { armUp = 1.16; armFwd = 0.24; }
+    if (m === 'neon') { armUp = 1.20; armFwd = 0.22; }
+    var jitter = moving ? Math.sin(ph * 1.3) * 0.012 : 0;
+    var armL = new T.Vector3(-0.15, armUp + jitter, armFwd);
+    var armR = new T.Vector3(0.15, armUp + jitter, armFwd);
+
+    /* 云台三轴：不同运镜的轴动作不同，这是"云台怎么动"的可视化核心 */
+    var yaw = 0, roll = 0, pitch = 0;
+    if (m === 'whip') {
+      /* 甩镜：偏航轴快速大幅左右甩动（0.2~0.3 秒级） */
+      var sw = Math.sin(Math.min(1, p) * Math.PI * 2);
+      yaw = sw * 0.85;
+      roll = sw * 0.22;
+    } else if (m === 'orbit') {
+      /* 环绕：偏航轴持续跟住主体（朝向由 _compute 的 yaw 承担），横滚微倾 */
+      roll = Math.sin(p * Math.PI) * 0.10;
+      pitch = -0.03;
+    } else if (m === 'crane') {
+      /* 升高：俯仰轴由平视转下俯，是本手法最直观的云台动作 */
+      pitch = p * 0.42;
+      roll = Math.sin(p * Math.PI) * 0.05;
+    } else if (m === 'follow') {
+      /* 跟随：横滚轴随步伐轻微摇摆，模拟手持减震的浮动 */
+      roll = Math.sin(ph * 0.8) * 0.055 * A;
+      yaw = Math.sin(ph * 0.5) * 0.03 * A;
+    } else if (m === 'ramp') {
+      /* 变速：降速段云台俯仰微调，制造"顿挫"前的准备动作 */
+      pitch = (p > 0.42 && p < 0.72) ? -0.08 : 0.02;
+      roll = Math.sin(ph * 0.6) * 0.03 * A;
+    } else if (m === 'dutch') {
+      /* 荷兰角：横滚轴持续倾斜，正是该手法的本质 */
+      roll = -(this.params.tilt || 14) * Math.PI / 180;
+    } else if (m === 'dolly') {
+      /* 推拉：俯仰轴保持水平，横滚几乎为零——稳定推进 */
+      roll = Math.sin(ph * 0.5) * 0.012 * A;
+      pitch = 0.01;
+    } else {
+      roll = Math.sin(ph * 0.6) * 0.02 * A;
+    }
+
+    return { legL: legL, legR: legR, armL: armL, armR: armR,
+      bob: bob, yaw: yaw, roll: roll, pitch: pitch };
+  };
+
   Stage.prototype._loop = function () {
     var self = this;
     if (!this.playing) return;

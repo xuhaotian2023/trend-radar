@@ -353,6 +353,60 @@
      三、AI 运镜编排台
      ============================================================ */
   var stage = null, stageReady = false, plan = null, curMoveIdx = 0, rafProg = 0;
+  var curEnvId = null, curEnvManual = false;
+
+  /* 可切换的预演场景（id 与 scene-env.js / cinematography.js 对齐） */
+  var ENV_LIST = [
+    { id: 'indoor-window', short: '室内窗边', tip: '单侧窗光 · 柔和侧光，适合家居/日常/治愈' },
+    { id: 'cafe-mood', short: '咖啡馆', tip: '窗光 + 暖色吊灯，适合探店/下午茶/聊天' },
+    { id: 'street-night', short: '夜景街头', tip: '霓虹冷暖对冲 + 路灯，适合探店/都市/情绪' },
+    { id: 'sports-arena', short: '天台/运动', tip: '顶光 + 侧逆光，适合运动/热血/竞技' },
+    { id: 'studio-clean', short: '棚拍', tip: '主柔光 + 侧逆光勾边，适合产品/开箱/带货' },
+    { id: 'outdoor-golden', short: '户外黄金', tip: '低角度暖阳逆光，适合旅行/户外/人像' },
+    { id: 'rain-reflect', short: '雨后反光', tip: '街灯硬光 + 湿地倒影，适合氛围/情绪' },
+    { id: 'generic', short: '通用外景', tip: '中性空间，未识别场景时的默认环境' }
+  ];
+
+  function syncModeButtons(mode) {
+    var modes = $('#ocModes');
+    if (!modes) return;
+    $$('button', modes).forEach(function (b) { b.classList.toggle('on', b.dataset.m === mode); });
+    var hint = $('#ocModeHint');
+    if (hint) {
+      hint.textContent = mode === 'follow'
+        ? '跟机视角：这就是摄影师取景框里的画面 · 切回「环绕观察」可继续自由旋转'
+        : mode === 'fly'
+          ? '自由飞行：拖拽转向 · W/A/S/D 或方向键平移 · Q/E 升降 · 滚轮推进'
+          : '环绕观察：拖动旋转 · 滚轮缩放 · 右键平移';
+    }
+    /* 跟机/飞行时预设视角不适用，置灰提示 */
+    var views = $('#ocViews');
+    if (views) views.classList.toggle('dim', mode !== 'orbit');
+  }
+
+  function syncEnvButtons() {
+    var pick = $('#ocEnvPick');
+    if (!pick) return;
+    $$('button', pick).forEach(function (b) {
+      var on = b.dataset.env === curEnvId;
+      b.classList.toggle('on', on && !curEnvManual);
+      b.classList.toggle('auto', on && curEnvManual);
+    });
+    /* 自动匹配时给一个额外标记，说明这是按描述选的 */
+    if (curEnvId && !$('.oc-envpick button[data-env="' + curEnvId + '"]', document)) return;
+    var line = $('#ocEnvLine');
+    if (line && stage && stage.ok) {
+      var info = stage.envInfo();
+      var envDef = ENV_LIST.filter(function (e) { return e.id === info.id; })[0];
+      if (envDef) {
+        line.hidden = false;
+        line.innerHTML = '当前场景：<b>' + esc(envDef.short) + '</b> · ' +
+          esc(envDef.tip) + (info.light ? '　|　光线：' + esc(info.light) : '');
+      } else {
+        line.hidden = true;
+      }
+    }
+  }
 
   function initOrchestra() {
     var ta = $('#ocText'), go = $('#ocGo'), samples = $('#ocSamples');
@@ -396,6 +450,36 @@
         b.addEventListener('click', function () {
           $$('button', views).forEach(function (x) { x.classList.toggle('on', x === b); });
           if (stage && stage.ok) stage.setOrbit(b.dataset.v);
+          syncModeButtons('orbit');
+        });
+      });
+    }
+
+    /* 观察模式：环绕观察 / 跟机视角 / 自由飞行 */
+    var modes = $('#ocModes');
+    if (modes) {
+      $$('button', modes).forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!stage || !stage.ok) return;
+          stage.setCamMode(b.dataset.m);
+          syncModeButtons(b.dataset.m);
+        });
+      });
+    }
+
+    /* 场景环境切换 */
+    var envPick = $('#ocEnvPick');
+    if (envPick) {
+      envPick.innerHTML = ENV_LIST.map(function (e) {
+        return '<button data-env="' + e.id + '" title="' + esc(e.tip || '') + '">' + esc(e.short) + '</button>';
+      }).join('');
+      $$('button', envPick).forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!stage || !stage.ok) return;
+          curEnvId = b.dataset.env;
+          curEnvManual = true;
+          stage.setEnvironment(curEnvId);
+          syncEnvButtons();
         });
       });
     }
@@ -471,6 +555,19 @@
         ensureStage();
         if (stage && stage.ok) {
           stage._resize();
+          /* 按方案里的场景自动搭建对应环境（用户手动选择过则不覆盖） */
+          if (plan.scene && window.GS_ENV && window.GS_ENV.has(plan.scene.id)) {
+            if (!curEnvManual || !curEnvId) {
+              curEnvId = plan.scene.id;
+              curEnvManual = false;
+              stage.setEnvironment(curEnvId);
+            }
+          } else if (!curEnvId) {
+            curEnvId = 'generic';
+            curEnvManual = false;
+            stage.setEnvironment(curEnvId);
+          }
+          syncEnvButtons();
           if (plan.demo) { stage.setMove(plan.demo.mode); stage.reset(); }
           curMoveIdx = 0;
           syncMoveCards();

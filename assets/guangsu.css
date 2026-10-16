@@ -1470,6 +1470,24 @@ hr,.rank-hr{border-color:var(--rule)}
 .pg-nav button:hover{background:rgba(255,255,255,.07);border-color:var(--rule-hi)}
 .td-empty{border-radius:10px}
 
+/* 场景选择器：放在 3D 面板标题右侧，点击即切换预演环境 */
+.oc-envpick{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:62%}
+.oc-envpick button{border:1px solid var(--rule);background:rgba(255,255,255,.03);color:var(--muted);
+  font-family:var(--font);font-size:10.5px;padding:3px 9px;border-radius:999px;cursor:pointer;
+  transition:all .22s var(--ease);white-space:nowrap}
+.oc-envpick button:hover{color:var(--ink);border-color:var(--rule-hi);background:rgba(255,255,255,.06)}
+.oc-envpick button.on{color:#c9fbff;background:rgba(34,211,238,.15);border-color:rgba(34,211,238,.45)}
+.oc-envpick button.auto{color:#ffe1b0;background:rgba(255,183,94,.13);border-color:rgba(255,183,94,.4)}
+/* 跟机 / 飞行模式下，预设机位不适用，整体压暗提示 */
+.oc-views.dim{opacity:.4;pointer-events:none}
+/* 当前场景光线说明 */
+.oc-envline{font-size:10.5px;color:var(--muted);line-height:1.6;margin:-4px 0 11px;
+  padding:7px 11px;border-radius:8px;background:rgba(255,255,255,.025);border:1px solid var(--rule)}
+.oc-envline b{color:var(--az)}
+/* 操作提示 */
+.oc-modehint{margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.02em}
+.oc-ctrl{flex-wrap:wrap;row-gap:8px}
+
 /* 解构台：面板玻璃化 + 按钮统一为设计系统外观 */
 .az-badge{border-radius:7px;border-color:rgba(34,211,238,.32);background:rgba(34,211,238,.05)}
 .drop{border-radius:12px;border-width:1px;border-color:rgba(34,211,238,.34);background:rgba(34,211,238,.02)}
@@ -1549,7 +1567,15 @@ hr,.rank-hr{border-color:var(--rule)}
 .fc-chart .fc-tip-t{fill:#e9eef8;font-size:10px;font-weight:700}
 .fc-chart .fc-tip-v{fill:#8a94ab;font-size:9px;font-family:var(--mono)}
 
-.fc-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px;margin-top:16px}
+/* 潜力榜与详情等高对齐：
+   左栏列表撑满面板可用高度（而不是固定 430px 被裁掉一半），
+   两栏底边因此始终齐平，不会出现"一边半截滚动条、一边大片留白"。 */
+.fc-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px;margin-top:16px;
+  align-items:stretch}
+.fc-grid>.fc-panel{display:flex;flex-direction:column;min-height:0}
+.fc-grid>.fc-panel>.fc-ph{flex:none}
+/* 列表条目固定行高：保证可视区恰好容纳整数条，滚动时不会把某一行切成半截 */
+.fc-item{min-height:74px;box-sizing:border-box}
 .fc-tabs{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap}
 .fc-tabs button{border:1px solid var(--rule);background:rgba(255,255,255,.03);color:var(--muted);
   font-family:var(--font);font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;cursor:pointer;
@@ -1558,7 +1584,8 @@ hr,.rank-hr{border-color:var(--rule)}
 .fc-tabs button.on{color:#fff;background:rgba(109,94,252,.18);border-color:rgba(109,94,252,.5)}
 
 /* 潜力榜列表 */
-.fc-list{display:flex;flex-direction:column;gap:8px;max-height:430px;overflow-y:auto;padding-right:4px}
+.fc-list{display:flex;flex-direction:column;gap:8px;flex:1;min-height:240px;
+  max-height:min(52vh,560px);overflow-y:auto;padding-right:4px;overscroll-behavior:contain}
 .fc-list::-webkit-scrollbar{width:6px}
 .fc-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:999px}
 .fc-item{display:flex;align-items:center;gap:12px;border:1px solid var(--rule);border-radius:11px;
@@ -1588,7 +1615,10 @@ hr,.rank-hr{border-color:var(--rule)}
 .fc-conf-t{font-size:9px;color:var(--muted);font-family:var(--mono);margin-top:2px}
 
 /* 详情面板 */
-.fc-detail{min-height:300px}
+/* 详情面板：内容超出时内部滚动，避免把整行撑高导致与左栏错位 */
+.fc-detail{min-height:300px;overflow-y:auto;overscroll-behavior:contain}
+.fc-detail::-webkit-scrollbar{width:6px}
+.fc-detail::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:999px}
 .fc-empty{display:flex;align-items:center;justify-content:center;height:100%;min-height:260px;text-align:center;
   color:var(--muted);font-size:12.5px;line-height:1.9}
 .fc-d-hd{border-bottom:1px solid var(--rule);padding-bottom:12px;margin-bottom:14px}
