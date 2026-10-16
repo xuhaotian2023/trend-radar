@@ -49,6 +49,7 @@
     $$('.view').forEach(function (v) { v.classList.toggle('active', v.id === 'view-' + name); });
     $$('.topnav button').forEach(function (b) { b.classList.toggle('active', b.dataset.nav === name); });
     if (name === 'today') renderToday();
+    if (typeof syncNavInd === 'function') syncNavInd();   // 视图切换后同步顶栏滑块位置
     var activeView = $('#view-' + name); if (activeView) activeView.scrollTop = 0;
   }
   /* ================= Boot 沉浸过渡（一级→二级 · 极光玻璃） ================= */
@@ -106,6 +107,26 @@
       bootRun(name === 'analyzer' ? '#22d3ee' : '#6d5efc', name, function () { goView(name); });
     });
   });
+  /* 顶栏导航指示器：单个胶囊内的滑块跟随选中项平滑滑动（首次定位不加动画，避免进场闪动） */
+  var navInd = $('#navInd'), navIndReady = false;
+  function syncNavInd() {
+    if (!navInd) return;
+    var active = $('.topnav button.active'); if (!active) return;
+    var w = active.offsetWidth, x = active.offsetLeft;
+    if (!w) return;                                     // 布局未就绪（隐藏视图）时跳过，交由 resize 兜底
+    if (!navIndReady) {
+      navInd.classList.add('nav-ind--noanim');
+      navInd.style.width = w + 'px';
+      navInd.style.transform = 'translateX(' + x + 'px)';
+      void navInd.offsetWidth; navInd.classList.remove('nav-ind--noanim');
+      navIndReady = true;
+    } else {
+      navInd.style.width = w + 'px';
+      navInd.style.transform = 'translateX(' + x + 'px)';
+    }
+  }
+  window.addEventListener('resize', function () { navIndReady = false; syncNavInd(); });
+  setTimeout(syncNavInd, 80);
 
   /* ================= 时钟 & 实时模拟 ================= */
   function tickClock() {
@@ -1492,11 +1513,16 @@
     $$('.hi', jyStage).forEach(function (el) { el.classList.remove('hi'); });
     $$('.jy-track.sel', jyStage).forEach(function (el) { el.classList.remove('sel'); });
     $$('.jy-clip.sel', jyStage).forEach(function (el) { el.classList.remove('sel'); });
-    if (jyTracksBox) jyTracksBox.classList.remove('hi');
+    $$('.jy-trans.sel', jyStage).forEach(function (el) { el.classList.remove('sel'); });
+    if (jyTracksBox) { jyTracksBox.classList.remove('hi'); jyTracksBox.classList.remove('has-sel'); }
     if (jyMarks) jyMarks.innerHTML = '';
     jyClearMask();
     var pw = $('#jyPaused'); if (pw) pw.remove();
-    var sub = $('#jsSub'); if (sub) sub.classList.remove('on');
+    var sub = $('#jsSub');
+    if (sub) {
+      if (sub._ovTimer) { clearTimeout(sub._ovTimer); sub._ovTimer = null; }
+      sub.classList.remove('on'); sub.classList.remove('sel');
+    }
   }
   function jyPauseUI(paused) {
     var cur = $('#jyPaused');
@@ -1510,6 +1536,7 @@
   }
   function jyDoPause() { if (jyPrev) { try { jyPrev.pause(); } catch (e) {} } jyVtStop(); jyPauseUI(true); }
   function jyDoPlay() {
+    jyClearSel();                                      // 播放即释放手动点选，恢复播放头驱动的自动联动高亮
     if (jyPrev && jyPrev.getAttribute('src')) { jyPrev.muted = false; jyPrev.volume = 1; }  // 用户手势 → 恢复声音
     if (jyReal()) { jyVtStop(); var p = jyPrev.play(); if (p && p.catch) p.catch(function () {}); }
     else jyVtStart();                                   // 演示样片无真实 src → 走虚拟时钟驱动播放头
@@ -1560,7 +1587,14 @@
   }
   function jySay(text) { jcNo.textContent = '工作台'; jcTxt.textContent = text; jcTxt.classList.add('full'); }
   /* 素材点选联动：监视器定位 + 覆盖层 + 定位到素材时间码 */
-  function jyOverlay(txt) { var sub = $('#jsSub'); if (sub) { sub.textContent = txt; sub.classList.add('on'); } }
+  function jyOverlay(txt) {
+    var sub = $('#jsSub'); if (!sub) return;
+    if (sub._ovTimer) { clearTimeout(sub._ovTimer); sub._ovTimer = null; }
+    if (txt) {
+      sub.textContent = txt; sub.classList.add('on'); sub.classList.add('sel');
+      sub._ovTimer = setTimeout(function () { sub.classList.remove('sel'); sub._ovTimer = null; }, 5000);
+    } else { sub.classList.remove('on'); sub.classList.remove('sel'); }
+  }
   function fmtT(t) { t = Math.max(0, t || 0); return pad(Math.floor(t / 60)) + ':' + pad(Math.floor(t % 60)) + '.' + Math.floor((t % 1) * 10); }
   function jyClipDur() { return (jyPrev && jyPrev.getAttribute('src') && isFinite(jyPrev.duration) && jyPrev.duration > 0) ? jyPrev.duration : 15; }
   function jySeekTo(t) {
@@ -1573,51 +1607,71 @@
     jyPaintHead(t); jySyncOnAir(t);                    // 播放头 + 工作台片段 + 素材库三方同步
     jyDoPause();
   }
-  function jySelectClip(el) {
-    el.classList.add('sel');
-    if (el.classList.contains('jy-trans')) {          // 素材交界处的免费转场标记
-      var tn = { n: el.dataset.n || '叠化', dur: el.dataset.dur || '0.5s' };
-      var bt = +el.dataset.et || 0;
-      jySeekTo(Math.max(0, bt - 0.1));
-      jyDrawBox([4, 38, 92, 20], '转场 · ' + tn.n, true);
-      jySay('已选中转场「' + tn.n + '」（免费）· 时长 ' + tn.dur + ' · 监视器已定位至转场帧 ' + fmtT(bt) + ' —— 转场作用于前后两段素材的交界处');
-      return;
+  /* ===== 时间轴单选状态：点选独立生效 =====
+     点一个素材 / 特效 / 转场，只有它自己亮起并给出说明；播放头、其余轨道、
+     素材库缩略图与属性面板都保持不动，不再一次性全联动。 */
+  var jySelKey = '', jySelRevert = null;
+  function jyHoldSel() { if (jyTracksBox) jyTracksBox.classList.add('has-sel'); }
+  function jySelLabel(el) {
+    if (el.classList.contains('jy-trans')) {
+      return '转场 · ' + (el.dataset.n || '叠化') + ' · ' + (el.dataset.dur || '0.5s');
     }
-    var tr = el.closest('.jy-track'); var tk = tr ? tr.dataset.tk : 'main';
-    var i = +el.dataset.i || 0, st = +el.dataset.st || 0, et = +el.dataset.et || 0, n = +el.dataset.n || 1;
-    var rng = fmtT(st) + ' – ' + fmtT(et);
+    var tr = el.closest('.jy-track'), tk = tr ? tr.dataset.tk : '';
+    if (tk === 'text' || tk === 'sub') return (tk === 'sub' ? '字幕' : '花字') + ' · ' + (el.dataset.t || '');
+    if (tk === 'fx') return '特效 · ' + (el.dataset.fx || '');
+    if (tk === 'pip') return '画中画 · 素材 ' + (el.dataset.n || '');
+    if (tk === 'audio' || tk === 'sfx') return (tk === 'sfx' ? '音效' : '音频') + ' · 素材 ' + (el.dataset.n || '');
+    return '主轨素材 ' + (el.dataset.n || 1);
+  }
+  /* 文案里的简称：去掉类别前缀，避免出现「已选中转场『转场 · 叠化』」这类叠字 */
+  function jySelShort(el) {
+    var lb = jySelLabel(el);
+    var m = /^(主轨素材|画中画 · 素材|音频 · 素材|音效 · 素材|转场)\s*·?\s*(.+)$/.exec(lb);
+    return m ? m[2] : lb;
+  }
+  /* 点选回执：监视器角标 + 底部说明同步显示被点中的那一个元素（角标 5 秒后自动收起） */
+  function jySelSay(el, msg) {
+    jySay(msg);
+    jyOverlay('已选中 · ' + jySelLabel(el));    // 角标自带的 5 秒计时负责收起，这里只负责点亮
+    if (jySelRevert) clearTimeout(jySelRevert);
+    jySelRevert = setTimeout(function () {
+      jySelRevert = null;
+      if (jyTracksBox) jyTracksBox.classList.remove('has-sel');
+    }, 5000);
+  }
+  function jySelectClip(el) {
+    var key = el.classList.contains('jy-trans') ? 'trans-' + (+el.dataset.i || 0) : 'clip:' + jySelLabel(el);
+    jySelKey = key;
+    el.classList.add('sel');
+    jyHoldSel();
+    jySelSay(el, jySelMsg(el, key));                // 说明文字即点选反馈（不触发任何联动）
+  }
+  function jySelMsg(el, key) {
+    var detail = '已选中' + (key.indexOf('trans-') === 0 ? '转场' : '') + '『' + jySelShort(el) + '』';
+    if (el.classList.contains('jy-trans')) {
+      var tn = el.dataset.n || '叠化', td = el.dataset.dur || '0.5s';
+      return detail + '（免费转场 · 时长 ' + td + '）· 作用于前后两段素材的交界处 —— 仅高亮这一个标记，播放头与其余轨道保持不动';
+    }
+    var tr = el.closest('.jy-track'), tk = tr ? tr.dataset.tk : 'main';
+    var st = +el.dataset.st || 0, et = +el.dataset.et || 0, n = +el.dataset.n || 1, rng = fmtT(st) + ' – ' + fmtT(et);
     if (tk === 'main') {
-      jySeekTo(st);
-      jyDrawBox([4, 4, 92, 92], '素材 ' + n + ' · ' + rng, false);
-      jySay('已选中主轨素材 ' + n + '（' + rng + '）· 时间码与原片一一对应，监视器已定位至素材起点 ' + fmtT(st) + ' 并暂停，可逐帧核对剪辑点');
-    } else if (tk === 'text' || tk === 'sub') {
+      return detail + '（主轨第 ' + n + ' 段 · ' + rng + '）· 时间码与原片一一对应 —— 只亮这一段，可直接核对剪辑点';
+    }
+    if (tk === 'text' || tk === 'sub') {
       var tt = el.dataset.t || ('文本 ' + n);
-      jySeekTo(st); jyOverlay('「' + tt + '」');
-      jyDrawBox([13, 64, 74, 23], (tk === 'sub' ? '字幕' : '文本') + ' · ' + tt, true);
-      jySay('已选中' + (tk === 'sub' ? '字幕' : '花字文本') + '「' + tt + '」（免费模板）· ' + rng + ' · 画面中对应文本已框出，预览已暂停');
-    } else if (tk === 'sticker') {
-      var sk = JY_STK[i % JY_STK.length];
-      jySeekTo(st); jyOverlay(sk);
-      jyDrawBox([66, 11, 26, 26], '贴纸 · ' + sk, true);
-      jySay('已选中贴纸素材「' + sk + '」（免费贴纸库）· ' + rng + ' · 画面右上角对应贴纸已框出');
-    } else if (tk === 'fx') {
-      var fx = el.dataset.fx || JY_FX[i % JY_FX.length];
-      jySeekTo(st);
-      jyDrawBox([4, 4, 92, 92], '特效 · ' + fx, true);
-      jySay('已选中特效「' + fx + '」（免费 · 路径：特效 → 氛围 → ' + fx + '）· ' + rng + ' · 免费特效作用于整幅画面');
-    } else if (tk === 'pip') {
-      jySeekTo(st);
-      var mkn = el.dataset.mask || (typeof maskOf === 'function' ? maskOf(i).n : '矩形');
+      return detail + '（' + (tk === 'sub' ? '字幕' : '花字文本') + ' · 免费模板 · ' + rng + '）—— 仅该文本片段高亮，预览画面保持不动';
+    }
+    if (tk === 'fx') {
+      var fx = el.dataset.fx || JY_FX[(n - 1) % JY_FX.length];
+      return detail + '（免费特效 · 路径：特效 → 氛围 → ' + fx + ' · ' + rng + '）—— 时间轴上只点亮这一个特效片段';
+    }
+    if (tk === 'pip') {
+      var mkn = el.dataset.mask || (typeof maskOf === 'function' ? maskOf(Math.max(0, n - 1)).n : '矩形');
       var mkd = MASK_LIB[0];
       for (var mi = 0; mi < MASK_LIB.length; mi++) { if (MASK_LIB[mi].n === mkn) { mkd = MASK_LIB[mi]; break; } }
-      jyDrawBox([54, 54, 40, 36], '画中画 · 素材 ' + n, false);
-      jyDrawMask(mkd);
-      jySay('已选中画中画素材 ' + n + '（' + rng + '）· 应用剪映免费蒙版「' + mkd.n + '」（' + mkd.path + ' · ' + mkd.rot + ' · ' + mkd.feather + '）—— ' + mkd.why);
-    } else {
-      jySeekTo(st);
-      jyDrawBox([4, 80, 92, 15], tk === 'sfx' ? '音效 · 素材 ' + n : '音频 · BGM', true);
-      jySay('已选中' + (tk === 'sfx' ? '音效素材 ' + n : '音频轨 BGM') + '（免费音效）· ' + rng + ' · 波形与黄色鼓点严格对齐');
+      return detail + '（画中画第 ' + n + ' 段 · ' + rng + ' · 免费蒙版「' + mkd.n + '」' + mkd.feather + '）—— 仅该画中画片段高亮';
     }
+    return detail + '（' + (tk === 'sfx' ? '免费音效' : '音频轨 BGM') + ' · ' + rng + '）—— 只亮这一个片段，鼓点与播放头不动';
   }
   /* 分镜方案：时间轴转场标记与分镜报告共用同一套数据（curPlan 为空时随机抽取） */
   var curPlan = null;
@@ -2084,8 +2138,17 @@
       $$('.jy-cv', jyStage).forEach(function (s) { s.classList.toggle('on', s === el); });
     }
 
+    /* 点空白轨道行：只选中该轨道本身（边框 + 轨道名反色），不再叠加通用高亮与联动说明 */
+    if (el.classList.contains('jy-track')) {
+      jySelectTrack(el.dataset.tk);
+      var tkName = el.dataset.l || el.dataset.tk;
+      var tdef = TRACK_SEL[el.dataset.tk];
+      jySay('已选中「' + tkName + '」轨道 —— 只高亮这一条轨道，其余轨道与播放头保持不动'
+        + (tdef ? '。' + tdef.t : ''));
+      return;
+    }
+
     if (!el.classList.contains('jy-track')) el.classList.add('hi');
-    else jySelectTrack(el.dataset.tk);
     if (def.track) jySelectTrack(def.track);
     jyDrawBox(def.box, def.label || '', def.free);
     if (def.mask) jyDrawMask(typeof maskOf === 'function' ? maskOf(0) : MASK_LIB[0]);
@@ -2868,6 +2931,7 @@
   /* 播放头所在素材 → 各轨片段 + 左侧素材库缩略图同步高亮 */
   function jySyncOnAir(t) {
     if (!jyTrackList) return;
+    if (jySelKey) return;        // 手动点选期间不覆盖：播放头驱动的自动联动高亮让位于「点谁只亮谁」
     var dur = jyDur(), activeThumb = {}, mainIdx = -1;
     $$('.jy-track', jyTrackList).forEach(function (tr) {
       var tk = tr.dataset.tk, clips = $$('.jy-clip', tr), hit = -1;
@@ -2938,6 +3002,7 @@
     jyRulerEl.addEventListener('pointerdown', function (e) {
       if (e.button !== 0 || jyFlowWrap.classList.contains('locked')) return;
       e.preventDefault(); e.stopPropagation();
+      jyClearSel();                                   // 拖标尺定位 → 释放手动点选，恢复自动联动高亮
       jyTlMoved = true;                                // 本次 click 交给 scrub，避免重复定位
       jyStopLoop(); jyAutoUI(false);
       jyScrub = { id: e.pointerId };

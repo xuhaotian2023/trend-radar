@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>光溯 GUANGSU · 视频热点捕捉与分析平台</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='none' stroke='%236d5efc' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%2322d3ee' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='%2322d3ee'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="assets/guangsu.css?v=20261016p1">
+<link rel="stylesheet" href="assets/guangsu.css?v=20261017p1">
 <script src="./_shared/js/tailwind.js"></script>
 <script>
   /* Tailwind Play CDN（本地内置，离线可用）：关闭 preflight，避免重置既有设计系统样式；
@@ -55,15 +55,16 @@
     </svg>
     <div class="b-name">光溯<em>GUANGSU</em></div>
   </div>
-  <nav class="topnav">
-    <div class="nav-group">
-      <span class="nav-tag">热点</span>
-      <button class="active" data-nav="map">热点星图</button>
-    </div>
-    <div class="nav-group nav-teach">
-      <span class="nav-tag">剪辑教学</span>
-      <button data-nav="analyzer">AI 剪辑解构台</button>
-    </div>
+  <nav class="topnav" aria-label="主导航">
+    <span class="nav-ind" id="navInd" aria-hidden="true"></span>
+    <button class="active" data-nav="map">
+      <svg class="nv-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.3"/><circle cx="5" cy="6.2" r="1.7"/><circle cx="19" cy="6.6" r="1.7"/><circle cx="12" cy="20" r="1.7"/><path d="M6.4 7.2 10.4 11M17.6 7.7 13.4 10.9M12 14.3v4"/></svg>
+      <span>热点星图</span>
+    </button>
+    <button data-nav="analyzer">
+      <svg class="nv-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h16M4 12h9M4 18.5h6"/><path d="M17.5 14.5v6M14.5 17.5h6"/></svg>
+      <span>AI 剪辑解构台</span>
+    </button>
   </nav>
   <div class="top-right">
     <span class="live-badge" id="liveBadge" title="数据实时刷新中"><i></i>LIVE</span>
@@ -98,8 +99,7 @@
           <div class="ring r3"></div><div class="ring r2"></div><div class="ring r1"></div>
           <div class="sweep"></div>
           <div class="hub-in">
-            <div class="h-cap">GUANGSU HUB</div>
-            <h1>光溯 · 全网热点中枢</h1>
+            <h1 class="hub-title">热点中枢</h1>
             <div class="h-k"><b id="hubTopics">0</b><span>话题在榜</span></div>
             <div class="h-k"><b id="hubEst">0</b><span>今日总预估播放</span></div>
             <div class="h-online"><i></i>6 大分支实时在线</div>
@@ -349,10 +349,10 @@
 <script src="./_shared/js/echarts.min.js"></script>
 <script src="assets/data.js?v=20261016b"></script>
 <script src="assets/charts.js?v=20261016b"></script>
-<script src="assets/app.js?v=20261016p1"></script>
+<script src="assets/app.js?v=20261017p1"></script>
 <script src="./_shared/js/three.min.js" defer></script>
 <script src="./_shared/js/motion.min.js" defer></script>
-<script src="assets/gs-ui.js?v=20261016p1" defer></script>
-<script src="assets/gs-fx.js?v=20261016p1" defer></script>
+<script src="assets/gs-ui.js?v=20261017p1" defer></script>
+<script src="assets/gs-fx.js?v=20261017p1" defer></script>
 </body>
 </html>
