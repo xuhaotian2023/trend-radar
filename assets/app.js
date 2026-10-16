@@ -1,4 +1,4 @@
-/* 热点雷达 · 交互层：路由 / 思维导图 / 实时模拟 / 弹窗 */
+/* 光溯 · 交互层：路由 / 思维导图 / 实时模拟 / 弹窗 */
 (function () {
   'use strict';
   var D = window.RADAR_DATA;
@@ -806,7 +806,7 @@
           '<div class="pv-heat"><b id="pvHeat">0.0</b><span>实时热度指数</span></div>' +
         '</div>' +
         '<p class="pv-desc">' + p.desc + '</p>' +
-        '<div class="pv-kpis">' +
+        '<div class="pv-kpis gs-bento">' +
           '<div class="kpi clk" role="button" tabindex="0" aria-expanded="false" data-kpi="topics"><span class="k-go">点击展开明细 ▾</span><div class="k-l">在榜话题数</div><div class="k-v">' + p.topicCount + '<small>个</small></div><div class="k-bar"><i data-w="' + (p.topicCount / 40 * 100) + '"></i></div></div>' +
           '<div class="kpi clk" role="button" tabindex="0" aria-expanded="false" data-kpi="est"><span class="k-go">点击展开明细 ▾</span><div class="k-l">平均预估播放</div><div class="k-v">' + fmtWan(p.avgEst) + '</div><div class="k-bar"><i data-w="' + (p.avgEst / 21000 * 100).toFixed(1) + '"></i></div></div>' +
           '<div class="kpi clk" role="button" tabindex="0" aria-expanded="false" data-kpi="peak"><span class="k-go">点击展开明细 ▾</span><div class="k-l">峰值增速（24h）</div><div class="k-v">+' + p.peak.toFixed(1) + '<small>%</small></div><div class="k-bar"><i data-w="' + (p.peak / 30 * 100).toFixed(1) + '"></i></div></div>' +
@@ -936,7 +936,7 @@
           '<span class="ov-badge ghost">实时抓取</span>' +
         '</div>' +
         '<h2>' + esc(t.title) + '</h2>' +
-        '<div class="ov-sub">热点雷达 · ' + D.updatedAt + ' 抓取快照 · 剪辑手法 / 视频内核 / 流量预估三维分析</div></div>' +
+        '<div class="ov-sub">光溯 · ' + D.updatedAt + ' 抓取快照 · 剪辑手法 / 视频内核 / 流量预估三维分析</div></div>' +
         '<div class="ov-score"><b>' + t.heat.toFixed(1) + '</b><div class="gr up">▲ ' + t.growth.toFixed(1) + '% / 24h</div><span>热度指数</span></div>' +
       '</div>' +
       '<div class="ov-grid">' +

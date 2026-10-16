@@ -1,4 +1,4 @@
-/* 热点雷达 · ECharts 图表层 */
+/* 光溯 · ECharts 图表层 */
 window.Charts = (function () {
   var cs = getComputedStyle(document.documentElement);
   var accent = cs.getPropertyValue('--accent').trim();
