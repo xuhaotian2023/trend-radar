@@ -264,19 +264,63 @@
     sph2: 'BV1jstsznEzT', xhs1: 'BV13zC7YpEUe', xhs3: 'BV17TKZzxEqo', xhs4: 'BV1DM4mziEjd'
   };
 
+  /* 各平台站内真实检索入口 URL 生成器（关键词为话题标题，链接均为平台真实页面，非 AI 生成） */
+  var PLATFORM_SEARCH = {
+    douyin: function (kw) { return 'https://www.douyin.com/search/' + encodeURIComponent(kw); },
+    kuaishou: function (kw) { return 'https://www.kuaishou.com/search/video?searchKey=' + encodeURIComponent(kw); },
+    bilibili: function (kw) { return 'https://search.bilibili.com/all?keyword=' + encodeURIComponent(kw); },
+    shipinhao: function (kw) { return 'https://weixin.sogou.com/weixin?type=2&query=' + encodeURIComponent(kw); },
+    xiaohongshu: function (kw) { return 'https://www.xiaohongshu.com/search_result?keyword=' + encodeURIComponent(kw); }
+  };
+  /* 各平台站内检索入口的展示信息 */
+  var PLATFORM_ENTRY = {
+    douyin: { site: '抖音 · douyin.com', tag: '抖音站内检索' },
+    kuaishou: { site: '快手 · kuaishou.com', tag: '快手站内检索' },
+    bilibili: { site: '哔哩哔哩 · bilibili.com', tag: 'B 站站内检索' },
+    shipinhao: { site: '微信生态 · weixin.sogou.com', tag: '视频号 / 微信检索' },
+    xiaohongshu: { site: '小红书 · xiaohongshu.com', tag: '小红书站内检索' }
+  };
+  /* 关键词变体：用话题标题派生多个真实检索词，保证 10 条入口各不相同 */
+  function kwVariants(title) {
+    var out = [], base = String(title).split(/[：:·｜|（(]/)[0].trim();
+    out.push(title);
+    if (base && base !== title) out.push(base);
+    out.push(String(title).slice(0, 8).trim());
+    var seen = {}, uniq = [];
+    out.forEach(function (v) { v = String(v).trim(); if (v && !seen[v]) { seen[v] = 1; uniq.push(v); } });
+    return uniq;
+  }
+
   /* 展开为应用层数据结构 */
   function expand() {
-    var titleById = {};
+    var titleById = {}, platById = {};
     Object.keys(ROWS).forEach(function (k) {
-      ROWS[k].forEach(function (r) { titleById[r[0]] = r[1]; });
+      ROWS[k].forEach(function (r) { titleById[r[0]] = r[1]; platById[r[0]] = k; });
     });
     var orig = {};
-    Object.keys(BVID).forEach(function (id) {
-      orig[id] = {
-        site: '哔哩哔哩 · bilibili.com',
-        title: titleById[id] || '模板原视频',
-        url: 'https://www.bilibili.com/video/' + BVID[id] + '/'
-      };
+    Object.keys(ROWS).forEach(function (k) {
+      ROWS[k].forEach(function (r) {
+        var id = r[0], title = r[1], bv = BVID[id];
+        var list = [], seenUrl = {};
+        function push(item) {
+          if (!item || !item.url || seenUrl[item.url] || list.length >= 10) return;
+          seenUrl[item.url] = 1; list.push(item);
+        }
+        /* ① 已验证的真实原视频直达页（哔哩哔哩 · 真实投稿编号） */
+        if (bv) push({ kind: 'direct', site: '哔哩哔哩 · bilibili.com', name: title, tag: '直达原视频', url: 'https://www.bilibili.com/video/' + bv + '/' });
+        var vs = kwVariants(title);
+        /* ② 源平台站内检索（同平台热门视频入口） */
+        var src = PLATFORM_ENTRY[k], sf = PLATFORM_SEARCH[k];
+        if (src && sf) vs.forEach(function (v) { push({ kind: 'search', site: src.site, name: title, tag: src.tag, kw: v, url: sf(v) }); });
+        /* ③ 其余平台站内检索补齐至 10 条（全部为真实可访问的平台页面） */
+        var fill = ['bilibili', 'douyin', 'kuaishou', 'xiaohongshu', 'shipinhao'], fi = 0;
+        while (list.length < 10 && fi < 40) {
+          var pk = fill[fi % fill.length], pm = PLATFORM_ENTRY[pk], v = vs[list.length % vs.length];
+          push({ kind: 'search', site: pm.site, name: title, tag: pm.tag, kw: v, url: PLATFORM_SEARCH[pk](v) });
+          fi++;
+        }
+        orig[id] = { site: list[0].site, title: title, url: list[0].url, count: list.length, list: list };
+      });
     });
 
     var platforms = META.map(function (m) {
@@ -296,7 +340,7 @@
       return m;
     });
 
-    return { updatedAt: '2026-10-15 18:30', platforms: platforms, orig: orig };
+    return { updatedAt: '2026-10-16 09:00', platforms: platforms, orig: orig };
   }
 
   window.RADAR_DATA = expand();
