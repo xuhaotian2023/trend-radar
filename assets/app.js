@@ -50,6 +50,7 @@
     $$('.topnav button').forEach(function (b) { b.classList.toggle('active', b.dataset.nav === name); });
     if (name === 'today') renderToday();
     if (typeof syncNavInd === 'function') syncNavInd();   // 视图切换后同步顶栏滑块位置
+    if (window.GS_EXT && window.GS_EXT.onViewEnter) window.GS_EXT.onViewEnter(name);
     var activeView = $('#view-' + name); if (activeView) activeView.scrollTop = 0;
   }
   /* ================= Boot 沉浸过渡（一级→二级 · 极光玻璃） ================= */

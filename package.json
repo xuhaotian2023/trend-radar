@@ -1,0 +1,16 @@
+{
+  "name": "trend-radar",
+  "version": "2.0.0",
+  "private": true,
+  "description": "光溯 GUANGSU · 视频热点捕捉与分析平台（静态前端 + 轻量代理服务）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["热点", "短视频", "运镜", "剪辑"],
+  "license": "MIT"
+}
