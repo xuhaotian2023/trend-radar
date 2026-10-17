@@ -381,7 +381,7 @@
         ? '跟机视角：这就是摄影师取景框里的画面 · 切回「环绕观察」可继续自由旋转'
         : mode === 'fly'
           ? '自由飞行：拖拽转向 · W/A/S/D 或方向键平移 · Q/E 升降 · 滚轮推进'
-          : '环绕观察：拖动旋转 · 滚轮缩放 · 右键平移';
+          : '环绕观察：拖动旋转 · 滚轮缩放 · 右键平移 · 点击角色可调整位置';
     }
     /* 跟机/飞行时预设视角不适用，置灰提示 */
     var views = $('#ocViews');
@@ -535,6 +535,9 @@
       });
     }
 
+    /* 角色移动流程的浮动确认面板 */
+    bindMovePanel();
+
     /* 场景环境切换 */
     var envPick = $('#ocEnvPick');
     if (envPick) {
@@ -579,6 +582,9 @@
         var pb = $('#ocPlay'); if (pb) pb.innerHTML = '<i>▶</i>播放预演';
         paintProgress(1);
       };
+      /* 角色移动流程状态回调：驱动浮动确认面板与舞台锁定描边 */
+      stage._onMoveState = function (info) { renderMovePanel(info); };
+      renderMovePanel(stage.moveStateInfo());
       stage.setOrbit('free');
       stage.setMove((plan && plan.demo && plan.demo.mode) || 'dolly');
       /* 恢复用户此前选择的动物 / 天气 / 人数 */
@@ -612,6 +618,59 @@
       var p = stage.dur > 0 ? Math.min(1, stage.t / stage.dur) : 0;
       paintProgress(p);
     })();
+  }
+
+  /* ---------- 角色移动流程的浮动确认面板 ----------
+     状态流转：idle（无面板）→ selected（确认是否移动该角色）
+               → moving（确认是否移动完成）→ idle */
+  function renderMovePanel(info) {
+    var panel = $('#ocMovePanel');
+    var stageBox = $('#ocStage');
+    if (!panel) return;
+    var st = info && info.state ? info.state : 'idle';
+
+    if (st === 'idle') {
+      panel.hidden = true;
+      if (stageBox) stageBox.classList.remove('moving-mode');
+      return;
+    }
+
+    panel.hidden = false;
+    if (stageBox) stageBox.classList.add('moving-mode');
+
+    var title = $('#ocMpTitle'), hint = $('#ocMpHint');
+    var btnMove = $('#ocMpConfirmMove'), btnDone = $('#ocMpConfirmDone');
+    var btnCancel = $('#ocMpCancel'), tip = $('#ocMpTip');
+    var role = (info && info.role) || '角色';
+
+    if (st === 'selected') {
+      title.textContent = '已选中「' + role + '」';
+      hint.textContent = '视角已锁定';
+      btnMove.hidden = false;
+      btnDone.hidden = true;
+      btnCancel.hidden = false;
+      tip.textContent = '确认「移动该角色」后进入移动模式：此时拖动画面只移动角色，不转动视角。';
+    } else if (st === 'moving') {
+      title.textContent = '正在移动「' + role + '」';
+      hint.textContent = '拖动画面移动角色 · 视角锁定';
+      btnMove.hidden = true;
+      btnDone.hidden = false;
+      btnCancel.hidden = false;
+      tip.textContent = '把角色拖到目标位置后点「确定移动完成」；点「取消」则还原到移动前的位置。';
+    }
+  }
+
+  function bindMovePanel() {
+    var btnMove = $('#ocMpConfirmMove'), btnDone = $('#ocMpConfirmDone'), btnCancel = $('#ocMpCancel');
+    if (btnMove) btnMove.addEventListener('click', function () {
+      if (stage && stage.ok) stage.confirmMoveRole();
+    });
+    if (btnDone) btnDone.addEventListener('click', function () {
+      if (stage && stage.ok) stage.commitMove();
+    });
+    if (btnCancel) btnCancel.addEventListener('click', function () {
+      if (stage && stage.ok) stage.cancelMove();
+    });
   }
 
   function runCompose() {

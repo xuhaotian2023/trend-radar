@@ -700,8 +700,12 @@
       this.animalKind = null;
       this.animalLabel = null;
 
-      this._bindOrbit();
-      this._bindPickDrag();      // 支持在 3D 视图里直接拖动角色调位置
+      /* 绑定顺序很重要：角色拾取必须先于视角拖拽注册。
+         因为两者都监听同一个 canvas 的 pointerdown，先注册的先执行；
+         角色拾取需要在命中角色时用 stopImmediatePropagation 拦下本次手势，
+         这样"点角色"绝不会顺带把视角转掉。 */
+      this._bindPickDrag();      // 先：角色点选与移动
+      this._bindOrbit();         // 后：环绕/飞行视角
       this._resize();
       this.syncSize();          // 布局未就绪时持续重试，保证绘制缓冲与容器一致
       /* 容器尺寸变化（例如父级从 hidden 变为可见）时自动同步绘制缓冲。
@@ -714,6 +718,9 @@
       }
       this.ok = true;
       this._built = true;
+      /* 暴露实例：便于在控制台或自动化测试中检查/驱动预演台状态
+         （只读用途，不影响运行时行为） */
+      window.GS_STAGE = this;
       return true;
     } catch (e) {
       this.ok = false;
@@ -733,24 +740,38 @@
     this.camera.lookAt(this.target);
   };
 
-  /* ---------- 手动拖拽调整角色位置 ----------
-     在 3D 视图里直接拖动某个角色，把它挪到想要的位置。
-     做法：按下时用射线找出点到的是哪个角色，拖动时把射线与地面的交点
-     作为目标点；位移以"相对自动走位的偏移"记录，因此播放/切手法时
-     手动调整依然生效，不会被自动走位覆盖。
-     仅左键、且不与其他交互冲突（飞行模式由飞行接管）。 */
+  /* ---------- 手动调整角色位置（带确认流程的状态机）----------
+      需求：选中并移动角色时不允许视角转动，等角色移动确定后再恢复视角转动。
+
+      状态流转：
+        idle      正常状态，视角可自由旋转/缩放/平移
+          ↓ 点选某个角色（射线命中）
+        selected  已选中角色，等待用户确认"是否移动该角色"
+                  视角已锁定；面板提供「移动该角色」「取消」
+          ↓ 点「移动该角色」
+        moving    已确认要移动，可拖动该角色到目标位置
+                  视角保持锁定；面板提供「确定移动完成」「取消」
+          ↓ 点「确定移动完成」或「取消」
+        idle       恢复视角转动
+
+      只有回到 idle 才解锁视角，因此移动过程中视角绝不会被带着跑。 */
   Stage.prototype._bindPickDrag = function () {
     var self = this, el = this.renderer.domElement;
-    var drag = null;
     var ray = new T.Raycaster();
     var groundPlane = new T.Plane(new T.Vector3(0, 1, 0), 0);
+
+    /* 状态 */
+    this.moveState = 'idle';            // idle | selected | moving
+    this.selectedRole = null;           // { kind:'a'|'s', idx:n }
+    this._moveStart = { x: 0, z: 0 };   // 进入流程时的初始偏移，供「取消」还原
+    this._moveDragging = false;         // 是否正按住拖动（区分"划过"与"拖拽"）
+    this._onMoveState = null;           // UI 状态回调
 
     function pickRole(clientX, clientY) {
       var rect = el.getBoundingClientRect();
       var nx = ((clientX - rect.left) / rect.width) * 2 - 1;
       var ny = -((clientY - rect.top) / rect.height) * 2 + 1;
       ray.setFromCamera(new T.Vector2(nx, ny), self.camera);
-      /* 依次检测各角色的头/躯干，命中哪个就拖哪个 */
       var lists = [{ arr: self.actors, kind: 'a' }, { arr: self.shooters, kind: 's' }];
       for (var i = 0; i < lists.length; i++) {
         var arr = lists[i].arr;
@@ -761,7 +782,6 @@
           if (head && ray.intersectObject(head, false).length) {
             return { kind: lists[i].kind, idx: j };
           }
-          /* 躯干近似：用整体包围盒再兜一次 */
           var hits = ray.intersectObject(fig, true);
           if (hits.length) return { kind: lists[i].kind, idx: j };
         }
@@ -769,28 +789,96 @@
       return null;
     }
 
+    /* 选中指示：地面环 + 竖直光柱，让"选中的是哪个"一目了然 */
+    function ensureSelRing() {
+      if (self._selRing) return;
+      var g = new T.Group();
+      var ring = new T.Mesh(
+        new T.RingGeometry(0.32, 0.38, 32),
+        new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, side: T.DoubleSide })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = 0.02;
+      g.add(ring);
+      /* 光柱只到胸口高度：既能定位，又不会高出头顶像个天线 */
+      var beam = new T.Mesh(
+        new T.CylinderGeometry(0.016, 0.016, 1.0, 8, 1, true),
+        new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.13, side: T.DoubleSide, depthWrite: false })
+      );
+      beam.position.y = 0.5;
+      g.add(beam);
+      self.scene.add(g);
+      self._selRing = g;
+    }
+    function clearSelRing() {
+      if (!self._selRing) return;
+      self.scene.remove(self._selRing);
+      self._selRing.traverse(function (o) {
+        if (o.geometry) { try { o.geometry.dispose(); } catch (e) {} }
+        if (o.material) { try { o.material.dispose(); } catch (e) {} }
+      });
+      self._selRing = null;
+    }
+    this._updateSelRing = function () {
+      if (this.moveState === 'idle' || !this.selectedRole) { clearSelRing(); return; }
+      ensureSelRing();
+      var st = this._compute(this.dur > 0 ? Math.min(1, this.t / this.dur) : 0);
+      var all = this.selectedRole.kind === 'a' ? st.all.actors : st.all.shooters;
+      var p = all[Math.min(this.selectedRole.idx, all.length - 1)];
+      if (p && this._selRing) this._selRing.position.set(p.pos.x, 0, p.pos.z);
+    };
+    this._emitMoveState = function () {
+      this._updateSelRing();
+      this.invalidate();
+      if (this._onMoveState) {
+        try {
+          /* 传出去的是可直接显示的文案（角色名 + 状态），
+             避免 UI 层拿到裸对象显示成 [object Object] */
+          this._onMoveState(this.moveStateInfo());
+        } catch (e) {}
+      }
+    };
+
+    /* 点选角色 → selected。
+       命中角色时用 stopImmediatePropagation 拦下本次手势，
+       保证"点角色"不会同时触发视角拖拽（这是用户明确要求的）。 */
     el.addEventListener('pointerdown', function (e) {
       if (e.button !== 0) return;
-      /* 自由飞行模式下不拖角色（避免与视角操作打架） */
-      if ((self.camMode || 'orbit') === 'fly') return;
+
+      /* 移动流程中：本次手势专用于移动角色，视角一律不响应。
+         这里同时置上"正在拖拽"标记——只有按下并拖动才位移角色，
+         否则鼠标只是从画面上划过去，角色也会跟着跑，那是错的。 */
+      if (self.moveState === 'moving') {
+        self._moveDragging = true;
+        try { el.setPointerCapture(e.pointerId); } catch (err) {}
+        e.stopImmediatePropagation();
+        return;
+      }
+
       var hit = pickRole(e.clientX, e.clientY);
-      if (!hit) return;
+      if (!hit) {
+        /* 点空白处：若处于选中态则取消选择，并且不把这次手势交给视角，
+           避免"想取消却顺手转了视角"。 */
+        if (self.moveState === 'selected') {
+          self.cancelMove();
+          e.stopImmediatePropagation();
+        }
+        return;
+      }
       e.preventDefault();
-      e.stopPropagation();
-      try { el.setPointerCapture(e.pointerId); } catch (err) {}
-      drag = hit;
-      el.style.cursor = 'move';
-      /* 高亮：给被拖的角色加一个地面指示环 */
-      self._dragRing = new T.Mesh(
-        new T.RingGeometry(0.34, 0.40, 28),
-        new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, side: T.DoubleSide })
-      );
-      self._dragRing.rotation.x = -Math.PI / 2;
-      self.scene.add(self._dragRing);
+      e.stopImmediatePropagation();   // 拦住后面的视角拖拽
+      /* 记录初始偏移，供「取消」还原 */
+      var list = hit.kind === 'a' ? self.manualOffset.a : self.manualOffset.s;
+      var cur = list[hit.idx] || { x: 0, z: 0 };
+      self._moveStart = { x: cur.x, z: cur.z };
+      self.selectedRole = hit;
+      self.moveState = 'selected';
+      self._emitMoveState();
     });
 
+    /* 仅"moving 状态 + 已按下"才响应拖动（避免鼠标划过就带着角色跑） */
     el.addEventListener('pointermove', function (e) {
-      if (!drag) return;
+      if (self.moveState !== 'moving' || !self.selectedRole || !self._moveDragging) return;
       var rect = el.getBoundingClientRect();
       var nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       var ny = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -803,35 +891,78 @@
       pt.z = Math.max(-lim, Math.min(lim, pt.z));
       /* 记录为"相对该角色当前自动位置的偏移" */
       var st = self._compute(self.dur > 0 ? Math.min(1, self.t / self.dur) : 0);
-      var base = drag.kind === 'a'
-        ? st.all.actors[Math.min(drag.idx, st.all.actors.length - 1)].pos
-        : st.all.shooters[Math.min(drag.idx, st.all.shooters.length - 1)].pos;
-      var list = drag.kind === 'a' ? self.manualOffset.a : self.manualOffset.s;
-      if (!list[drag.idx]) list[drag.idx] = { x: 0, z: 0 };
-      list[drag.idx].x = pt.x - base.x;
-      list[drag.idx].z = pt.z - base.z;
-      if (self._dragRing) self._dragRing.position.set(pt.x, 0.02, pt.z);
+      var all = self.selectedRole.kind === 'a' ? st.all.actors : st.all.shooters;
+      var base = all[Math.min(self.selectedRole.idx, all.length - 1)].pos;
+      var list = self.selectedRole.kind === 'a' ? self.manualOffset.a : self.manualOffset.s;
+      if (!list[self.selectedRole.idx]) list[self.selectedRole.idx] = { x: 0, z: 0 };
+      list[self.selectedRole.idx].x = pt.x - base.x;
+      list[self.selectedRole.idx].z = pt.z - base.z;
+      self._updateSelRing();
       self.invalidate();
     });
 
+    /* pointerup 结束"本次拖拽手势"，但流程仍留在 moving——
+       必须由用户点「确定移动完成」或「取消」才结束，
+       这样中途松手可以继续按住再拖微调，不会误提交。 */
     ['pointerup', 'pointercancel'].forEach(function (ev) {
       el.addEventListener(ev, function () {
-        if (!drag) return;
-        drag = null;
-        el.style.cursor = 'grab';
-        if (self._dragRing) {
-          self.scene.remove(self._dragRing);
-          self._dragRing = null;
-        }
+        self._moveDragging = false;
       });
     });
   };
 
-  /* ---------- 环绕/飞行视角的鼠标与键盘绑定 ---------- */
+  /* ---------- 角色移动流程的对外操作（供 UI 按钮调用） ---------- */
+  /* 确认"要移动这个角色"：selected → moving */
+  Stage.prototype.confirmMoveRole = function () {
+    if (this.moveState !== 'selected' || !this.selectedRole) return false;
+    this.moveState = 'moving';
+    this._emitMoveState();
+    return true;
+  };
+  /* 确认"移动完成"：提交当前偏移，moving → idle */
+  Stage.prototype.commitMove = function () {
+    if (this.moveState !== 'moving') return false;
+    this.moveState = 'idle';
+    this.selectedRole = null;
+    this._moveDragging = false;
+    this._emitMoveState();
+    return true;
+  };
+  /* 取消：还原到进入流程时的偏移，回到 idle */
+  Stage.prototype.cancelMove = function () {
+    if (this.moveState === 'idle') return false;
+    if (this.selectedRole) {
+      var list = this.selectedRole.kind === 'a' ? this.manualOffset.a : this.manualOffset.s;
+      if (!list[this.selectedRole.idx]) list[this.selectedRole.idx] = { x: 0, z: 0 };
+      list[this.selectedRole.idx].x = this._moveStart.x;
+      list[this.selectedRole.idx].z = this._moveStart.z;
+    }
+    this.moveState = 'idle';
+    this.selectedRole = null;
+    this._moveDragging = false;
+    this._emitMoveState();
+    return true;
+  };
+  /* 当前是否处于角色移动流程（供视角控制判断是否锁定） */
+  Stage.prototype.isMovingRole = function () {
+    return this.moveState === 'selected' || this.moveState === 'moving';
+  };
+  Stage.prototype.moveStateInfo = function () {
+    var roleName = '';
+    if (this.selectedRole) {
+      roleName = (this.selectedRole.kind === 'a' ? '演员 ' : '摄影师 ') + (this.selectedRole.idx + 1);
+    }
+    return { state: this.moveState, role: roleName };
+  };
+
+  /* ---------- 环绕/飞行视角的鼠标与键盘绑定 ----------
+     注意：处于角色移动流程（selected / moving）时，视角输入全部忽略，
+     避免"想移角色结果视角跟着转"。只有回到 idle 才恢复。 */
   Stage.prototype._bindOrbit = function () {
     var self = this, el = this.renderer.domElement;
     var drag = null;
     el.addEventListener('pointerdown', function (e) {
+      if (self.isMovingRole()) return;      // 角色移动流程中：锁定视角
       e.preventDefault();
       el.setPointerCapture && el.setPointerCapture(e.pointerId);
       drag = { x: e.clientX, y: e.clientY, btn: e.button, theta: self.sph.theta, phi: self.sph.phi,
@@ -873,6 +1004,7 @@
       });
     });
     el.addEventListener('wheel', function (e) {
+      if (self.isMovingRole()) return;      // 角色移动流程中：锁定视角
       e.preventDefault();
       self.nudgeDist(1 + (e.deltaY > 0 ? 0.12 : -0.12));
     }, { passive: false });
@@ -880,12 +1012,14 @@
     el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
     /* 键盘：自由飞行模式下用 WASD / 方向键 / Q E 在空间里移动。
-       监听挂在 window 上，但只在"自由飞行 + 画布在视口内"时生效，避免抢页面快捷键。 */
+       监听挂在 window 上，但只在"自由飞行 + 画布在视口内"时生效，避免抢页面快捷键。
+       角色移动流程中同样禁用——视角必须锁定。 */
     function inView() {
       var r = el.getBoundingClientRect();
       return r.bottom > 0 && r.top < (window.innerHeight || 0) && r.width > 0;
     }
     window.addEventListener('keydown', function (e) {
+      if (self.isMovingRole()) return;      // 角色移动流程中：锁定视角
       if (self.camMode !== 'fly' || !inView()) return;
       var k = String(e.key || '').toLowerCase();
       if (['w', 'a', 's', 'd', 'q', 'e', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].indexOf(k) >= 0) {
@@ -1619,6 +1753,8 @@
       var posS = (lj === 0) ? st.C.pos : st.all.shooters[lj].pos;
       if (this.shooterLabels[lj]) this.shooterLabels[lj].position.set(posS.x, 1.90, posS.z);
     }
+    /* 选中指示环跟随被选角色 */
+    if (this._selRing && this.moveState !== 'idle') this._updateSelRing();
 
     /* 轨迹：把已走过的路径画出来 */
     if (force || this.playing) {
