@@ -17,43 +17,65 @@
   var T = window.THREE;
   var host = null, api = null;
 
-  /* ---------- 火柴人构造 ---------- */
+  /* ---------- 火柴人构造（带关节）----------
+     骨架分层：胯(hip) → 腰(waist) → 胸(chest) → 颈(neck) → 头(head)
+     四肢各两节：肩→肘→腕、胯→膝→踝，因此可以做出屈肘、屈膝、抬手等自然动作，
+     而不是原来"肩→手、胯→脚"一根直棍。
+     关节处放小球，转动时能看清是哪个关节在动。 */
   function makeStick(color, opts) {
     opts = opts || {};
     var g = new T.Group();
-    var mat = new T.MeshBasicMaterial({ color: color });
     var lineMat = new T.LineBasicMaterial({ color: color, transparent: true, opacity: 0.95 });
+    var jointMat = new T.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.55 });
     var headMat = new T.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.9 });
 
     var s = opts.scale || 1;
-    var headR = 0.15 * s;
     var seg = function (len) { return len * s; };
+    var headR = seg(0.15);
+    var jointR = seg(0.028);
 
-    /* 关节高度（相对地面） */
-    var hipY = seg(0.82), shoulderY = seg(1.30), neckY = seg(1.36), headY = seg(1.52);
+    /* 骨架关键高度（相对地面，单位米） */
+    var ankleY = 0, kneeY = seg(0.44), hipY = seg(0.82);
+    var waistY = seg(0.98), chestY = seg(1.16), neckY = seg(1.36), headY = seg(1.52);
 
     /* 头 */
     var head = new T.Mesh(new T.SphereGeometry(headR, 14, 12), headMat);
     head.position.y = headY;
     g.add(head);
 
-    /* 躯干：颈 → 胯 */
-    var torsoGeo = new T.BufferGeometry().setFromPoints([
-      new T.Vector3(0, neckY, 0), new T.Vector3(0, hipY, 0)
-    ]);
-    g.add(new T.Line(torsoGeo, lineMat));
-
-    /* 四肢：用 Line 表示，便于每帧改端点做动作 */
-    function limb(from, to) {
+    /* 躯干：胯→腰→胸→颈 分三段，可做出弯腰/转身 */
+    function bone(from, to) {
       var geo = new T.BufferGeometry().setFromPoints([from.clone(), to.clone()]);
       var line = new T.Line(geo, lineMat);
       g.add(line);
       return line;
     }
-    var armL = limb(new T.Vector3(0, shoulderY, 0), new T.Vector3(-seg(0.30), seg(0.98), 0));
-    var armR = limb(new T.Vector3(0, shoulderY, 0), new T.Vector3(seg(0.30), seg(0.98), 0));
-    var legL = limb(new T.Vector3(0, hipY, 0), new T.Vector3(-seg(0.16), 0, 0));
-    var legR = limb(new T.Vector3(0, hipY, 0), new T.Vector3(seg(0.16), 0, 0));
+    var spineLow = bone(new T.Vector3(0, hipY, 0), new T.Vector3(0, waistY, 0));
+    var spineMid = bone(new T.Vector3(0, waistY, 0), new T.Vector3(0, chestY, 0));
+    var spineUp = bone(new T.Vector3(0, chestY, 0), new T.Vector3(0, neckY, 0));
+
+    /* 关节球：让旋转可见 */
+    function joint(y) {
+      var j = new T.Mesh(new T.SphereGeometry(jointR, 8, 6), jointMat);
+      j.position.y = y;
+      g.add(j);
+      return j;
+    }
+    var jWaist = joint(waistY), jChest = joint(chestY);
+
+    /* 四肢两节 */
+    var armL_up = bone(new T.Vector3(0, neckY, 0), new T.Vector3(-seg(0.17), seg(1.14), 0));
+    var armL_lo = bone(new T.Vector3(-seg(0.17), seg(1.14), 0), new T.Vector3(-seg(0.30), seg(0.98), 0));
+    var armR_up = bone(new T.Vector3(0, neckY, 0), new T.Vector3(seg(0.17), seg(1.14), 0));
+    var armR_lo = bone(new T.Vector3(seg(0.17), seg(1.14), 0), new T.Vector3(seg(0.30), seg(0.98), 0));
+    var legL_up = bone(new T.Vector3(0, hipY, 0), new T.Vector3(-seg(0.09), kneeY, 0));
+    var legL_lo = bone(new T.Vector3(-seg(0.09), kneeY, 0), new T.Vector3(-seg(0.16), ankleY, 0));
+    var legR_up = bone(new T.Vector3(0, hipY, 0), new T.Vector3(seg(0.09), kneeY, 0));
+    var legR_lo = bone(new T.Vector3(seg(0.09), kneeY, 0), new T.Vector3(seg(0.16), ankleY, 0));
+
+    /* 脚掌：一小段横线，让站姿有"踩地"感 */
+    var footL = bone(new T.Vector3(-seg(0.16), ankleY, 0), new T.Vector3(-seg(0.16), ankleY, seg(0.14)));
+    var footR = bone(new T.Vector3(seg(0.16), ankleY, 0), new T.Vector3(seg(0.16), ankleY, seg(0.14)));
 
     /* 地面圆环，标明站位 */
     var ringMat = new T.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.22, side: T.DoubleSide });
@@ -62,18 +84,191 @@
     ring.position.y = 0.006;
     g.add(ring);
 
-    g.userData = { head: head, armL: armL, armR: armR, legL: legL, legR: legR,
-      hipY: hipY, shoulderY: shoulderY, neckY: neckY, headY: headY, s: s, mat: mat, lineMat: lineMat };
+    g.userData = {
+      head: head,
+      spineLow: spineLow, spineMid: spineMid, spineUp: spineUp,
+      armL_up: armL_up, armL_lo: armL_lo, armR_up: armR_up, armR_lo: armR_lo,
+      legL_up: legL_up, legL_lo: legL_lo, legR_up: legR_up, legR_lo: legR_lo,
+      footL: footL, footR: footR,
+      jWaist: jWaist, jChest: jChest,
+      hipY: hipY, waistY: waistY, chestY: chestY, neckY: neckY, headY: headY,
+      kneeY: kneeY, ankleY: ankleY, s: s, lineMat: lineMat
+    };
     return g;
   }
 
-  /* 更新四肢端点（用于走路摆臂 / 举相机等动作） */
-  function poseLimb(line, from, to) {
+  /* 更新单节骨骼端点 */
+  function poseBone(line, from, to) {
     var p = line.geometry.attributes.position;
     p.setXYZ(0, from.x, from.y, from.z);
     p.setXYZ(1, to.x, to.y, to.z);
     p.needsUpdate = true;
     line.geometry.computeBoundingSphere();
+  }
+  /* 兼容旧调用名 */
+  var poseLimb = poseBone;
+
+  /* ---------- 把"姿态描述"应用到关节骨架 ----------
+     姿态里给出的是各肢体末梢位置（腕 / 踝）与弯曲量，这里据此反推肘与膝的位置，
+     从而让两节骨骼呈现自然的屈伸，而不是一根直棍。
+     bend>0 表示关节向后弯（肘向体后、膝向体后），符合人体实际活动方向。 */
+  function applySkeleton(u, pose) {
+    var S = u;
+
+    /* 躯干：允许轻微前倾/侧倾与扭转 */
+    var bend = pose.spine || 0;          // 前倾弧度
+    var twist = pose.twist || 0;         // 扭转弧度
+    var lean = pose.sideLean || 0;       // 侧倾
+    var dx = Math.sin(twist) * 0.02;
+    var hipP = new T.Vector3(0, S.hipY, 0);
+    var waistP = new T.Vector3(dx * 0.5, S.waistY, Math.sin(bend) * 0.035);
+    var chestP = new T.Vector3(dx, S.chestY, Math.sin(bend) * 0.075 + lean * 0.02);
+    var neckP = new T.Vector3(dx * 1.3, S.neckY, Math.sin(bend) * 0.10 + lean * 0.03);
+    poseBone(S.spineLow, hipP, waistP);
+    poseBone(S.spineMid, waistP, chestP);
+    poseBone(S.spineUp, chestP, neckP);
+    S.jWaist.position.set(waistP.x, waistP.y, waistP.z);
+    S.jChest.position.set(chestP.x, chestP.y, chestP.z);
+    /* 头跟随颈部，并可按需要低头/抬头 */
+    var headP = new T.Vector3(neckP.x, neckP.y + (S.headY - S.neckY), neckP.z + Math.sin(bend + (pose.headPitch || 0)) * 0.05);
+    S.head.position.copy(headP);
+
+    /* 肩点：由胸位置派生，保证与躯干连贯 */
+    var shL = new T.Vector3(chestP.x - 0.17, S.neckY - 0.02, chestP.z);
+    var shR = new T.Vector3(chestP.x + 0.17, S.neckY - 0.02, chestP.z);
+
+    /* 手臂：给定腕部位置 wrist，肘部取"肩腕连线的中点 + 侧向偏移" */
+    function arm(up, lo, sh, wrist, bendAmt) {
+      var mid = new T.Vector3().addVectors(sh, wrist).multiplyScalar(0.5);
+      /* 肘向体后（+Z 稍偏）与体外偏移，形成自然折角 */
+      var dir = new T.Vector3().subVectors(wrist, sh);
+      var len = dir.length() || 1;
+      mid.z += (bendAmt == null ? 0.06 : bendAmt);
+      mid.y += len * 0.04;
+      poseBone(up, sh, mid);
+      poseBone(lo, mid, wrist);
+    }
+    arm(S.armL_up, S.armL_lo, shL, pose.wristL || new T.Vector3(-0.30, 0.98, 0), pose.elbowL);
+    arm(S.armR_up, S.armR_lo, shR, pose.wristR || new T.Vector3(0.30, 0.98, 0), pose.elbowR);
+
+    /* 腿：给定踝部位置 ankle，膝部取"胯踝连线中点 + 向前偏移"（膝盖向前弯） */
+    function leg(up, lo, foot, hip, ankle, kneeFwd) {
+      var mid = new T.Vector3().addVectors(hip, ankle).multiplyScalar(0.5);
+      mid.z -= (kneeFwd == null ? 0.05 : kneeFwd);   // 膝向前
+      poseBone(up, hip, mid);
+      poseBone(lo, mid, ankle);
+      /* 脚掌朝前 */
+      poseBone(foot, ankle, new T.Vector3(ankle.x, ankle.y, ankle.z + 0.14));
+    }
+    var hipL = new T.Vector3(hipP.x - 0.09, S.hipY, hipP.z);
+    var hipR = new T.Vector3(hipP.x + 0.09, S.hipY, hipP.z);
+    leg(S.legL_up, S.legL_lo, S.footL, hipL, pose.ankleL || new T.Vector3(-0.16, 0, 0), pose.kneeL);
+    leg(S.legR_up, S.legR_lo, S.footR, hipR, pose.ankleR || new T.Vector3(0.16, 0, 0), pose.kneeR);
+  }
+
+  /* ---------- 动物模型（猫 / 狗）----------
+     用与火柴人相同的"骨骼 = Line"手法，便于统一驱动与配色。
+     四足骨架：躯干 + 头(含吻部/耳朵) + 四肢两节 + 尾巴两节。
+     体型按真实比例：
+       猫 肩高 ~0.25m、体长 ~0.45m、腿短、尾长且上翘
+       狗 肩高 ~0.45m、体长 ~0.75m、腿较长、尾下垂摆动
+     legTop 是肩/胯的离地高度，决定"腿有多长"——猫必须明显短于狗。 */
+  function makeAnimal(kind, color) {
+    var isCat = kind === 'cat';
+    var T_ = T;
+    var g = new T_.Group();
+    var lineMat = new T_.LineBasicMaterial({ color: color, transparent: true, opacity: 0.95 });
+    var bodyMat = new T_.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.88 });
+
+    /* 关键尺寸（米） */
+    var bodyH = isCat ? 0.16 : 0.26;          // 躯干厚度
+    var bodyLen = isCat ? 0.30 : 0.50;        // 躯干长度
+    var legLen = isCat ? 0.13 : 0.30;         // 腿长（肩高的一半左右）
+    var headR = isCat ? 0.070 : 0.105;
+    var bodyY = legLen + bodyH / 2;           // 躯干中心高度
+    var frontZ = bodyLen / 2, backZ = -bodyLen / 2;
+
+    function bone(from, to) {
+      var geo = new T_.BufferGeometry().setFromPoints([from.clone(), to.clone()]);
+      var line = new T_.Line(geo, lineMat);
+      g.add(line);
+      return line;
+    }
+
+    /* 躯干：用"椭球"更接近动物体态，而不是一根线 */
+    var torso = new T_.Mesh(new T_.SphereGeometry(1, 14, 10), bodyMat);
+    torso.scale.set(isCat ? 0.085 : 0.125, bodyH / 2, bodyLen / 2 + 0.02);
+    torso.position.set(0, bodyY, 0);
+    g.add(torso);
+    var spine = bone(new T_.Vector3(0, bodyY, frontZ), new T_.Vector3(0, bodyY, backZ));
+
+    /* 颈 + 头 */
+    var headY = bodyY + (isCat ? 0.075 : 0.105);
+    var headZ = frontZ + (isCat ? 0.055 : 0.075);
+    var neck = bone(new T_.Vector3(0, bodyY, frontZ), new T_.Vector3(0, headY - headR * 0.6, headZ - 0.02));
+    var headBall = new T_.Mesh(new T_.SphereGeometry(headR, 12, 10), bodyMat);
+    headBall.position.set(0, headY, headZ);
+    g.add(headBall);
+    /* 吻部：猫短、狗长 */
+    var muzzle = new T_.Mesh(
+      new T_.SphereGeometry(isCat ? 0.034 : 0.055, 8, 6), bodyMat);
+    muzzle.scale.set(1, isCat ? 0.75 : 0.68, isCat ? 1.1 : 1.5);
+    muzzle.position.set(0, headY - headR * 0.22, headZ + headR * (isCat ? 0.85 : 1.15));
+    g.add(muzzle);
+
+    /* 耳朵：猫为三角尖耳，狗为下垂耳片 */
+    [-1, 1].forEach(function (sd) {
+      if (isCat) {
+        var ear = new T_.Mesh(new T_.ConeGeometry(0.024, 0.052, 4), bodyMat);
+        ear.position.set(sd * 0.036, headY + headR * 0.85, headZ - 0.004);
+        ear.rotation.z = sd * 0.20;
+        g.add(ear);
+      } else {
+        var flap = new T_.Mesh(new T_.BoxGeometry(0.020, 0.075, 0.034), bodyMat);
+        flap.position.set(sd * (headR * 0.92), headY - 0.006, headZ - 0.004);
+        flap.rotation.z = sd * 0.30;
+        g.add(flap);
+      }
+    });
+
+    /* 四肢两节：上段(肩/胯→膝) + 下段(膝→足) */
+    var legX = isCat ? 0.055 : 0.085;
+    function leg(sd) {
+      var x = sd * legX;
+      var kneeY = legLen * 0.5;
+      return {
+        x: x, fz: frontZ, bz: backZ, kneeY: kneeY,
+        fUp: bone(new T_.Vector3(x, bodyY, frontZ), new T_.Vector3(x, kneeY, frontZ)),
+        fLo: bone(new T_.Vector3(x, kneeY, frontZ), new T_.Vector3(x, 0, frontZ)),
+        bUp: bone(new T_.Vector3(x, bodyY, backZ), new T_.Vector3(x, kneeY, backZ)),
+        bLo: bone(new T_.Vector3(x, kneeY, backZ), new T_.Vector3(x, 0, backZ))
+      };
+    }
+    var legs = [leg(-1), leg(1)];
+
+    /* 尾巴两节：猫长且上翘，狗短且自然下垂 */
+    var tailBase = new T_.Vector3(0, bodyY, backZ);
+    var tailMid, tailEnd;
+    if (isCat) {
+      tailMid = new T_.Vector3(0, bodyY + 0.10, backZ - 0.03);
+      tailEnd = new T_.Vector3(0, bodyY + 0.19, backZ + 0.01);
+    } else {
+      tailMid = new T_.Vector3(0, bodyY - 0.02, backZ - 0.07);
+      tailEnd = new T_.Vector3(0, bodyY - 0.06, backZ - 0.14);
+    }
+    var tail1 = bone(tailBase, tailMid);
+    var tail2 = bone(tailMid, tailEnd);
+
+    g.userData = {
+      kind: kind, isCat: isCat,
+      spine: spine, neck: neck, head: headBall, muzzle: muzzle, torso: torso,
+      legs: legs, tail1: tail1, tail2: tail2,
+      bodyY: bodyY, headY: headY, headZ: headZ, frontZ: frontZ, backZ: backZ,
+      tailBase: tailBase, tailMid: tailMid, tailEnd: tailEnd,
+      headR: headR, legX: legX, legLen: legLen, bodyLen: bodyLen, bodyH: bodyH,
+      lineMat: lineMat
+    };
+    return g;
   }
 
   /* ---------- 精细摄制装备：三轴云台 + 机身 + 镜头 + 监视屏 + 跟焦轮 ----------
@@ -197,10 +392,14 @@
     return g;
   }
 
-  /* ---------- 视锥：显示镜头拍到的范围 ---------- */
+  /* ---------- 视锥：显示镜头拍到的范围 + 仰角/俯角标识 ----------
+     除了四棱锥线框，还额外画出：
+       · 水平参考面（与地面平行），作为"0°"基准
+       · 角度弧：显示镜头相对水平面的俯仰角
+       · 垂直标尺：上下各一段，直观看出是仰拍还是俯拍
+     这些几何体随俯仰角实时变化，因此"仰角/俯角"不再只是文字，而是看得见的量。 */
   function makeFrustum(color) {
     var g = new T.Group();
-    /* 用线框锥体示意视野：底四角 + 顶点 */
     var fov = 52 * Math.PI / 180, dist = 1.7, aspect = 16 / 9;
     var hh = Math.tan(fov / 2) * dist, hw = hh * aspect;
     var apex = new T.Vector3(0, 0, 0);
@@ -218,7 +417,111 @@
     var face = new T.Mesh(new T.PlaneGeometry(hw * 2, hh * 2), faceMat);
     face.position.z = -dist;
     g.add(face);
+
+    /* --- 俯仰角标识（挂在视锥上，随镜头一起转） --- */
+    var ind = new T.Group();
+
+    /* 水平基准面：一块扁平的半透明矩形，代表"水平视线"。
+       刻意做小一些——它是参照物，不该盖过视锥主体。 */
+    var horizMat = new T.MeshBasicMaterial({ color: 0x9fb6dd, transparent: true, opacity: 0.13, side: T.DoubleSide, depthWrite: false });
+    var horiz = new T.Mesh(new T.PlaneGeometry(hw * 1.25, dist * 0.75), horizMat);
+    horiz.rotation.x = -Math.PI / 2;
+    horiz.position.set(0, 0, -dist * 0.42);
+    ind.add(horiz);
+    /* 水平面边框 */
+    var hb = new T.LineSegments(
+      new T.EdgesGeometry(new T.BoxGeometry(hw * 1.25, 0.002, dist * 0.75)),
+      new T.LineBasicMaterial({ color: 0x9fb6dd, transparent: true, opacity: 0.38 })
+    );
+    hb.position.set(0, 0, -dist * 0.42);
+    ind.add(hb);
+    /* 中心轴线：从镜头中心向前的水平参考线 */
+    ind.add(new T.Line(
+      new T.BufferGeometry().setFromPoints([new T.Vector3(0, 0, 0), new T.Vector3(0, 0, -dist * 1.15)]),
+      new T.LineBasicMaterial({ color: 0x9fb6dd, transparent: true, opacity: 0.5 })
+    ));
+    /* 垂直标尺：向上与向下各一段，长度随俯仰角变化（运行时改 drawRange） */
+    var vMat = new T.LineBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.85 });
+    var upGeo = new T.BufferGeometry().setFromPoints([new T.Vector3(0, 0, -dist), new T.Vector3(0, 1, -dist)]);
+    var dnGeo = new T.BufferGeometry().setFromPoints([new T.Vector3(0, 0, -dist), new T.Vector3(0, -1, -dist)]);
+    var upLine = new T.Line(upGeo, vMat);
+    var dnLine = new T.Line(dnGeo, vMat);
+    ind.add(upLine);
+    ind.add(dnLine);
+    /* 角度弧：在水平面与视线之间画一段弧，弧长即俯仰角大小 */
+    var ARC_SEG = 20;
+    var arcGeo = new T.BufferGeometry();
+    arcGeo.setAttribute('position', new T.BufferAttribute(new Float32Array((ARC_SEG + 1) * 3), 3));
+    var arcLine = new T.Line(arcGeo, new T.LineBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.9 }));
+    arcLine.frustumCulled = false;
+    ind.add(arcLine);
+    /* 角度数值标签 */
+    var angLabel = makeLabel('0°', '#ffd166');
+    if (angLabel) { angLabel.scale.set(0.42, 0.15, 1); ind.add(angLabel); }
+
+    g.add(ind);
+    g.userData = {
+      ind: ind, upLine: upLine, dnLine: dnLine, arcLine: arcLine,
+      arcGeo: arcGeo, angLabel: angLabel, dist: dist, ARC_SEG: ARC_SEG
+    };
     return g;
+  }
+
+  /* 根据俯仰角刷新角度标识。
+     pitch>0 表示镜头向下俯（俯角），pitch<0 表示向上仰（仰角）。 */
+  function updateFrustumAngle(frustum, pitch) {
+    var u = frustum.userData;
+    if (!u || !u.ind) return;
+    var ang = pitch || 0;
+    var deg = ang * 180 / Math.PI;
+    var dist = u.dist;
+
+    /* 垂直标尺长度按角度大小伸缩（tan，最多限制到 1.2 避免过长） */
+    var vlen = Math.min(1.2, Math.abs(Math.tan(ang)) * dist * 1.1 + 0.04);
+    var upLen = ang < 0 ? vlen : 0.001;   // 仰角→向上画
+    var dnLen = ang > 0 ? vlen : 0.001;   // 俯角→向下画
+    var pa = u.upLine.geometry.attributes.position;
+    pa.setXYZ(1, 0, upLen, -dist); pa.needsUpdate = true;
+    u.upLine.geometry.computeBoundingSphere();
+    var pb = u.dnLine.geometry.attributes.position;
+    pb.setXYZ(1, 0, -dnLen, -dist); pb.needsUpdate = true;
+    u.dnLine.geometry.computeBoundingSphere();
+    u.upLine.visible = upLen > 0.01;
+    u.dnLine.visible = dnLen > 0.01;
+
+    /* 角度弧：在 YZ 平面内从水平方向扫到当前视线方向 */
+    var arr = u.arcGeo.attributes.position.array;
+    var N = u.ARC_SEG;
+    var R = dist * 0.55;
+    for (var i = 0; i <= N; i++) {
+      var a = ang * (i / N);
+      arr[i * 3] = 0;
+      arr[i * 3 + 1] = Math.sin(a) * R;
+      arr[i * 3 + 2] = -Math.cos(a) * R;
+    }
+    u.arcGeo.attributes.position.needsUpdate = true;
+    u.arcGeo.computeBoundingSphere();
+    u.arcLine.visible = Math.abs(deg) > 0.6;
+
+    /* 数值标签：显示在弧的中点附近 */
+    if (u.angLabel) {
+      var am = ang * 0.5;
+      u.angLabel.position.set(0, Math.sin(am) * R * 1.35, -Math.cos(am) * R * 1.35);
+      u.angLabel.visible = Math.abs(deg) > 0.6;
+      /* 重绘文字（Sprite 纹理由 makeLabel 生成，需整体替换才能改字） */
+      var txt = (deg > 0 ? '俯 ' : '仰 ') + Math.abs(deg).toFixed(0) + '°';
+      if (u.angLabel._txt !== txt) {
+        u.angLabel._txt = txt;
+        var nt = makeLabel(txt, '#ffd166');
+        if (nt) {
+          nt.scale.set(0.46, 0.16, 1);
+          nt.position.copy(u.angLabel.position);
+          u.ind.remove(u.angLabel);
+          u.ind.add(nt);
+          u.angLabel = nt;
+        }
+      }
+    }
   }
 
   /* ---------- 轨迹线 ---------- */
@@ -374,6 +677,11 @@
       if (this.actorLabel) this.scene.add(this.actorLabel);
       if (this.shooterLabel) this.scene.add(this.shooterLabel);
 
+      /* 动物设置：默认无，由 setAnimal 决定是否加入 */
+      this.animal = null;
+      this.animalKind = null;
+      this.animalLabel = null;
+
       this._bindOrbit();
       this._resize();
       this.syncSize();          // 布局未就绪时持续重试，保证绘制缓冲与容器一致
@@ -427,6 +735,7 @@
         var f = self._fly || (self._fly = { v: new T.Vector3(), yaw: drag.yaw, pitch: drag.pitch, keys: {} });
         f.yaw = drag.yaw - dx * Math.PI * 1.6;
         f.pitch = Math.max(-1.35, Math.min(1.35, drag.pitch - dy * Math.PI * 1.1));
+        self.invalidate();
         return;
       }
       if (self.camMode === 'follow') return;   // 跟机视角由摄影师驱动，不响应拖拽
@@ -442,6 +751,7 @@
         self.sph.phi = Math.min(Math.PI * 0.92, Math.max(Math.PI * 0.06, drag.phi - dy * Math.PI * 1.1));
       }
       self._applyOrbit();
+      self.invalidate();
     });
     ['pointerup', 'pointercancel'].forEach(function (ev) {
       el.addEventListener(ev, function () {
@@ -543,26 +853,30 @@
     if (this.camMode === 'fly') {
       var f = this._fly; if (!f) return;
       f.yaw += dTheta; f.pitch = Math.max(-1.35, Math.min(1.35, f.pitch + dPhi));
+      this.invalidate();
       return;
     }
     this.sph.theta += dTheta;
     this.sph.phi = Math.min(Math.PI * 0.92, Math.max(Math.PI * 0.06, this.sph.phi + dPhi));
     this._applyOrbit();
+    this.invalidate();
   };
   Stage.prototype.nudgeDist = function (factor) {
     if (this.camMode === 'fly') {
       var f = this._fly; if (!f) return;
-      f.v.z = (f.v.z || 0);   // 飞行模式下滚轮改为前后推进
       f._push = (f._push || 0) + (factor > 1 ? -0.5 : 0.5);
+      this.invalidate();
       return;
     }
     this.sph.r = Math.min(18, Math.max(1.6, this.sph.r * factor));
     this._applyOrbit();
+    this.invalidate();
   };
   /* 自由飞行模式：按方向键/WASD 平移 */
   Stage.prototype.flyKey = function (key, down) {
     if (!this._fly) this._fly = { v: new T.Vector3(), yaw: 0, pitch: 0, keys: {} };
     this._fly.keys[key] = !!down;
+    if (down) this.invalidate();
   };
 
   Stage.prototype._resize = function () {
@@ -622,6 +936,8 @@
     this.scene.add(this.envGroup);
     this._envId = id;
     this._envInfo = { light: env.light, id: id };
+    /* 记录本场景的障碍区域，供走位求解器避让 */
+    this._obstacles = env.obstacles || null;
 
     /* 场景自带来光线语义时隐藏通用网格，避免与场景地板打架 */
     if (this.floorGrid) {
@@ -633,6 +949,104 @@
     return true;
   };
   Stage.prototype.envInfo = function () { return this._envInfo || { light: '', id: '' }; };
+
+  /* ---------- 动物：加入 / 移除 / 换种类 ----------
+     动物与演员一起构成"被拍对象"，默认站在演员侧前方（构图更自然），
+     并做呼吸、摆尾、偶尔抬头等小动作，避免像静止摆件。 */
+  Stage.prototype.setAnimal = function (kind) {
+    if (!this.ok) return false;
+    /* 先移除旧的 */
+    if (this.animal) {
+      this.scene.remove(this.animal);
+      this.animal.traverse(function (o) {
+        if (o.geometry) { try { o.geometry.dispose(); } catch (e) {} }
+        if (o.material) { try { o.material.dispose(); } catch (e) {} }
+      });
+      this.animal = null;
+      if (this.animalLabel) { this.scene.remove(this.animalLabel); this.animalLabel = null; }
+    }
+    if (!kind || kind === 'none') { this.animalKind = null; this._update(0, true); return true; }
+
+    /* 动物配色刻意避开环境色与角色色：猫用暖橘、狗用蜜金，都能在冷色环境里跳出来 */
+    var color = kind === 'cat' ? 0xffc27a : 0xffd98a;
+    this.animal = makeAnimal(kind, color);
+    this.animalKind = kind;
+    this.scene.add(this.animal);
+    this.animalLabel = makeLabel(kind === 'cat' ? '猫' : '狗', kind === 'cat' ? '#ffc27a' : '#ffd98a');
+    if (this.animalLabel) this.scene.add(this.animalLabel);
+    this._update(0, true);
+    return true;
+  };
+  Stage.prototype.animalInfo = function () { return { kind: this.animalKind }; };
+
+  /* 动物动作：呼吸起伏 + 尾巴摆动 + 头部转动 + 四肢微动 */
+  Stage.prototype._updateAnimal = function (p, moving) {
+    var an = this.animal;
+    if (!an) return;
+    var u = an.userData;
+    var t = this.t;
+    var m = this.mode;
+    var cat = u.isCat;
+
+    /* 站位：演员侧前方，避开演员身体以免重叠 */
+    var baseX = cat ? 0.58 : 0.78;
+    var baseZ = cat ? 0.30 : 0.42;
+    var wander = (m === 'follow') ? Math.sin(t * 0.8) * 0.16 : 0;
+    var x = baseX + wander;
+    var z = baseZ + (m === 'follow' ? Math.cos(t * 0.6) * 0.09 : 0);
+
+    /* 避障：动物也不能站进道具里 */
+    var ob = this._obstacles;
+    if (ob) {
+      var rr = ob.resolve(x, z, 0.26);
+      x = rr.x; z = rr.z;
+    }
+    an.position.set(x, 0, z);
+    /* 面朝演员 */
+    an.rotation.y = Math.atan2(-x, -z);
+
+    /* 呼吸：躯干与头部轻微起伏 */
+    var rate = cat ? 2.6 : 3.2;
+    var breathe = Math.sin(t * rate) * (cat ? 0.006 : 0.008);
+    an.position.y = breathe > 0 ? breathe : 0;
+
+    /* 尾巴：猫慢速轻摆（上翘），狗快速左右摇 */
+    var wagSpeed = cat ? 1.9 : 6.5;
+    var wagAmp = cat ? 0.045 : 0.11;
+    var wag = Math.sin(t * wagSpeed) * wagAmp;
+    var tm = u.tailMid.clone(), te = u.tailEnd.clone();
+    tm.x += wag * 0.5; te.x += wag * 1.5;
+    /* 直立摆尾时也让尾尖上下微动 */
+    te.y += Math.sin(t * wagSpeed * 1.7) * (cat ? 0.012 : 0.008);
+    poseBone(u.tail1, u.tailBase, tm);
+    poseBone(u.tail2, tm, te);
+
+    /* 头：偶发转头/抬头（两个不同频率叠加，避免看起来像机械摆动） */
+    var look = Math.sin(t * 0.63) * 0.6 + Math.sin(t * 0.21) * 0.4;
+    var headY = u.headY + Math.sin(t * rate) * 0.004;
+    var headZ = u.headZ - Math.abs(look) * 0.018;
+    var headX = look * 0.028;
+    u.head.position.set(headX, headY, headZ);
+    u.muzzle.position.set(headX, headY - u.headR * 0.22, headZ + u.headR * (cat ? 0.85 : 1.15));
+    poseBone(u.neck, new T.Vector3(0, u.bodyY, u.frontZ),
+      new T.Vector3(headX * 0.6, headY - u.headR * 0.6, headZ - 0.02));
+
+    /* 四肢：交替轻微踩踏（呼吸带动），让站姿不僵 */
+    u.legs.forEach(function (lg, i) {
+      var phase = t * rate + i * 1.6;
+      var lift = Math.max(0, Math.sin(phase)) * (cat ? 0.006 : 0.009);
+      poseBone(lg.fUp, new T.Vector3(lg.x, u.bodyY, lg.fz), new T.Vector3(lg.x, lg.kneeY, lg.fz));
+      poseBone(lg.fLo, new T.Vector3(lg.x, lg.kneeY, lg.fz), new T.Vector3(lg.x, lift, lg.fz));
+      poseBone(lg.bUp, new T.Vector3(lg.x, u.bodyY, lg.bz), new T.Vector3(lg.x, lg.kneeY, lg.bz));
+      poseBone(lg.bLo, new T.Vector3(lg.x, lg.kneeY, lg.bz), new T.Vector3(lg.x, lift, lg.bz));
+    });
+
+    /* 标签跟随（贴在头顶上方一点） */
+    if (this.animalLabel) {
+      var top = u.headY + u.headR + (cat ? 0.20 : 0.26);
+      this.animalLabel.position.set(x, top + an.position.y, z);
+    }
+  };
 
   /* ---------- 动作：按手法 id 生成"演员 + 摄影师"的走位与镜头运动 ---------- */
   Stage.prototype.setMove = function (moveId, opts) {
@@ -654,6 +1068,15 @@
     if (m === 'orbit') {
       var a = -Math.PI * 0.55 + p * Math.PI * 1.10;   // 约 200° 环绕
       var r = 2.5;
+      /* 若该角度会被障碍挡住，则把环绕半径向内收（保持弧形走向但不穿模） */
+      var obO = this._obstacles;
+      if (obO) {
+        var triesO = 0;
+        while (triesO++ < 8) {
+          if (!obO.blocked(Math.sin(a) * r, Math.cos(a) * r, 0.40)) break;
+          r -= 0.18;
+        }
+      }
       C.pos.set(Math.sin(a) * r, 1.05, Math.cos(a) * r);
       C.face = Math.atan2(A.pos.x - C.pos.x, A.pos.z - C.pos.z);
       label = '摄影师绕演员弧线移动，半径保持不变';
@@ -672,10 +1095,22 @@
       var rr = 1.5;
       A.pos.set(Math.sin(aa) * rr, 0, Math.cos(aa) * rr);
       A.face = aa + Math.PI / 2;
-      var ca = aa - 0.42;                                // 摄影师落后一点角度
-      C.pos.set(Math.sin(ca) * (rr + gap), 1.05, Math.cos(ca) * (rr + gap));
+      /* 摄影师落后一点角度，距离 = 演员半径 + 间距 */
+      var ca = aa - 0.42;
+      var camR = rr + gap;
+      /* 若该角度下摄影师会落到障碍/边界外，则向内收半径（贴位跟随，保证不穿模） */
+      var ob0 = this._obstacles;
+      if (ob0) {
+        var tries = 0;
+        while (tries++ < 6) {
+          var cx = Math.sin(ca) * camR, cz = Math.cos(ca) * camR;
+          if (!ob0.blocked(cx, cz, 0.40)) break;
+          camR -= 0.22;
+        }
+      }
+      C.pos.set(Math.sin(ca) * camR, 1.05, Math.cos(ca) * camR);
       C.face = Math.atan2(A.pos.x - C.pos.x, A.pos.z - C.pos.z);
-      label = '摄影师与演员保持 ' + gap.toFixed(1) + ' 米等距跟随';
+      label = '摄影师与演员保持约 ' + gap.toFixed(1) + ' 米等距跟随';
     } else if (m === 'crane') {
       var h = 1.1 + p * 2.3;
       var back = 2.4 + p * 1.4;
@@ -726,6 +1161,21 @@
     C.yaw = Math.atan2(dir.x, dir.z);
     C.pitch = Math.asin(Math.max(-1, Math.min(1, dir.y)));
 
+    /* 避障：把演员与摄影师推出场景道具（桌椅/灯架/器材），避免穿模。
+       演员优先级更高——摄影师的机位可以让，但主体不能被道具挤压到画外。 */
+    var ob = this._obstacles;
+    if (ob) {
+      var ra = ob.resolve(A.pos.x, A.pos.z, 0.42);
+      A.pos.x = ra.x; A.pos.z = ra.z;
+      var rc = ob.resolve(C.pos.x, C.pos.z, 0.40);
+      C.pos.x = rc.x; C.pos.z = rc.z;
+      /* 避让后重新计算镜头朝向，保证视锥仍指向演员 */
+      var dx2 = A.pos.x - C.pos.x, dz2 = A.pos.z - C.pos.z, dy2 = camLookAt.y - C.pos.y;
+      var dir2 = new T.Vector3(dx2, dy2, dz2).normalize();
+      C.yaw = Math.atan2(dir2.x, dir2.z);
+      C.pitch = Math.asin(Math.max(-1, Math.min(1, dir2.y)));
+    }
+
     return { A: A, C: C, camLookAt: camLookAt, label: label };
   };
 
@@ -748,29 +1198,30 @@
     var cg = this.shooter.userData.camGrp;
     cg.rotation.set(0, st.C.yaw, 0);
     this.frustum.rotation.set(-st.C.pitch, 0, 0);
+    /* 刷新仰角/俯角标识（几何 + 数值标签） */
+    updateFrustumAngle(this.frustum, st.C.pitch);
     this.shooter.rotation.y = st.C.yaw;
 
     /* 走路摆臂：按进度做正弦摆动，让火柴人不是"滑行" */
     var moving = this.playing ? 1 : 0;
     var a = this.actor.userData, sh = this.shooter.userData;
 
-    /* ---- 演员动作：由当前手法决定"演什么" ---- */
+    /* ---- 演员动作：由当前手法决定"演什么"（含各关节的两节骨） ---- */
     var perf = this._actorPerf(p, moving);
-    poseLimb(a.legL, new T.Vector3(0, a.hipY, 0), perf.legL);
-    poseLimb(a.legR, new T.Vector3(0, a.hipY, 0), perf.legR);
-    poseLimb(a.armL, new T.Vector3(0, a.shoulderY, 0), perf.armL);
-    poseLimb(a.armR, new T.Vector3(0, a.shoulderY, 0), perf.armR);
+    applySkeleton(a, perf);
     /* 躯干整体起伏：走路时上下颠簸，让动作有重量感 */
     this.actor.position.y = perf.bob;
     /* 转身/侧身：围绕手法需要做细微身体转动 */
     this.actor.rotation.y = st.A.face + perf.lean;
 
+    /* ---- 动物（若启用）：跟随演员位置做对应动作 ---- */
+    if (this.animal) {
+      this._updateAnimal(p, moving);
+    }
+
     /* ---- 摄影师：持机姿态 + 步伐 ---- */
     var sp = this._shooterPerf(p, moving);
-    poseLimb(sh.armL, new T.Vector3(0, sh.shoulderY, 0), sp.armL);
-    poseLimb(sh.armR, new T.Vector3(0, sh.shoulderY, 0), sp.armR);
-    poseLimb(sh.legL, new T.Vector3(0, sh.hipY, 0), sp.legL);
-    poseLimb(sh.legR, new T.Vector3(0, sh.hipY, 0), sp.legR);
+    applySkeleton(sh, sp);
     this.shooter.position.y = sp.bob;
 
     /* ---- 云台三轴：按运镜需要独立转动，让云台动作肉眼可见 ---- */
@@ -813,9 +1264,11 @@
     this.renderer.render(this.scene, this.camera);
   };
 
-  /* 按当前模式摆放观察相机 */
+  /* 按当前模式摆放观察相机。
+     dt 为空表示"交互重绘"帧——此时仍要处理飞行位移，否则暂停后就飞不动了。 */
   Stage.prototype._driveCamera = function (dt) {
     var mode = this.camMode || 'orbit';
+    var step = (dt == null || dt <= 0) ? 1 / 60 : Math.min(dt, 0.05);
 
     if (mode === 'follow') {
       /* 跟机视角：相机放到镜头前方一点（而不是机身中心），
@@ -835,9 +1288,10 @@
     }
 
     if (mode === 'fly') {
-      /* 自由飞行：方向键/WASD 平移 + 拖拽转向，完全脱离轨道 */
+      /* 自由飞行：方向键/WASD 平移 + 拖拽转向，完全脱离轨道。
+         暂停或播放结束后依然生效（由 _ensureIdleLoop 驱动重绘）。 */
       var f = this._fly || (this._fly = { v: new T.Vector3(), yaw: 0, pitch: 0, keys: {}, _push: 0 });
-      var speed = 3.4 * Math.max(0.016, Math.min(dt || 0.016, 0.05)) * 60 / 60;
+      var speed = 3.4 * step;
       var fwd = new T.Vector3(-Math.sin(f.yaw), 0, -Math.cos(f.yaw));
       var right = new T.Vector3(Math.cos(f.yaw), 0, -Math.sin(f.yaw));
       var mv = new T.Vector3();
@@ -848,7 +1302,10 @@
       if (k.d || k.arrowright) mv.add(right);
       if (k.q) mv.y -= 1;
       if (k.e) mv.y += 1;
-      if (mv.lengthSq() > 0) mv.normalize().multiplyScalar(speed);
+      if (mv.lengthSq() > 0) {
+        mv.normalize().multiplyScalar(speed);
+        this._idleDirty = true;                 // 有位移就保持重绘
+      }
       /* 滚轮推进 */
       if (f._push) { mv.addScaledVector(fwd, f._push * 0.35); f._push = 0; }
       this.camera.position.add(mv);
@@ -898,104 +1355,131 @@
      走路用反相正弦驱动四肢；不同手法叠加各自的"表演"（抬手、转身、定格等）。 */
   Stage.prototype._actorPerf = function (p, moving) {
     var a = this.actor.userData;
-    var hipY = a.hipY, shY = a.shoulderY;
     var m = this.mode;
     /* 步频：走位越快的镜头，步频越高 */
     var cadence = (m === 'follow' || m === 'whip') ? 8.2 : (m === 'orbit' || m === 'crane') ? 5.4 : 6.4;
     var ph = this.t * cadence;
     var A = moving ? 1 : 0;
 
-    /* 腿：反相摆动，幅度随步频 */
+    /* 基本走路周期：
+       腿前后摆动 + 抬脚（膝盖随抬腿而屈），手臂反相摆动且肘部自然微屈。 */
     var legSwing = Math.sin(ph) * 0.30 * A;
-    var legLift = Math.max(0, Math.sin(ph)) * 0.10 * A;
-    var legL = new T.Vector3(-0.15 - legSwing * 0.35, legLift, legSwing);
-    var legR = new T.Vector3(0.15 + legSwing * 0.35, Math.max(0, -Math.sin(ph)) * 0.10 * A, -legSwing);
+    var liftL = Math.max(0, Math.sin(ph));
+    var liftR = Math.max(0, -Math.sin(ph));
+    var ankleL = new T.Vector3(-0.15 - legSwing * 0.35, liftL * 0.09 * A, legSwing);
+    var ankleR = new T.Vector3(0.15 + legSwing * 0.35, liftR * 0.09 * A, -legSwing);
+    /* 抬腿时膝盖弯得更明显 */
+    var kneeL = 0.05 + liftL * 0.07 * A;
+    var kneeR = 0.05 + liftR * 0.07 * A;
 
-    /* 手臂：与腿反相，幅度略小 */
     var armSwing = Math.sin(ph + Math.PI) * 0.26 * A;
-    var armL = new T.Vector3(-0.30, 0.98, armSwing);
-    var armR = new T.Vector3(0.30, 0.98, -armSwing);
+    var wristL = new T.Vector3(-0.30, 0.98, armSwing);
+    var wristR = new T.Vector3(0.30, 0.98, -armSwing);
+    var elbow = 0.07;
 
-    /* 身体起伏：双脚交替支撑带来的上下颠簸 */
     var bob = Math.abs(Math.sin(ph)) * 0.035 * A;
+    var lean = 0, spine = 0, twist = 0, headPitch = 0;
 
-    var lean = 0;
-
-    /* ---- 各手法的专属表演 ---- */
+    /* ---- 各手法的专属表演（改为驱动关节姿态） ---- */
     if (m === 'orbit') {
-      /* 环绕：演员基本站定做展示动作，双手略微抬起（展示产品/自我） */
-      armL.set(-0.30, 1.02 + Math.sin(ph * 0.5) * 0.05, 0.10);
-      armR.set(0.30, 1.06 + Math.sin(ph * 0.5 + 1) * 0.05, 0.12);
+      /* 环绕：站定做展示动作，双肘抬起、手掌略向前（托举/介绍感） */
+      wristL.set(-0.28, 1.04 + Math.sin(ph * 0.5) * 0.04, -0.14);
+      wristR.set(0.28, 1.08 + Math.sin(ph * 0.5 + 1) * 0.04, -0.16);
+      elbow = 0.05;
       lean = Math.sin(ph * 0.4) * 0.10;
+      twist = Math.sin(ph * 0.4) * 0.10;
       bob = Math.abs(Math.sin(ph * 0.6)) * 0.012 * A;
+      ankleL.set(-0.16, 0, 0.01); ankleR.set(0.16, 0, -0.01);
+      kneeL = kneeR = 0.04;
     } else if (m === 'dolly') {
-      /* 推拉：演员多半在"表演情绪"，手臂自然摆动幅度小 */
+      /* 推拉：情绪表演，手臂小幅自然摆动，重心略前 */
       armSwing = Math.sin(ph + Math.PI) * 0.14 * A;
-      armL.set(-0.30, 0.98, armSwing);
-      armR.set(0.30, 0.98, -armSwing);
+      wristL.set(-0.30, 0.98, armSwing);
+      wristR.set(0.30, 0.98, -armSwing);
       lean = Math.sin(this.t * 1.1) * 0.05;
+      spine = 0.05 + Math.sin(this.t * 1.1) * 0.02;
     } else if (m === 'follow') {
-      /* 跟随：演员正常行走，手臂摆动最大 */
+      /* 跟随：正常行走，摆动最大、身体前倾 */
       armSwing = Math.sin(ph + Math.PI) * 0.34 * A;
-      armL.set(-0.30, 0.98, armSwing);
-      armR.set(0.30, 0.98, -armSwing);
+      wristL.set(-0.30, 0.98, armSwing);
+      wristR.set(0.30, 0.98, -armSwing);
       lean = 0.06 * A;
+      spine = 0.08 * A;
+      twist = Math.sin(ph) * 0.06 * A;
     } else if (m === 'crane') {
-      /* 升高：演员站定，双臂自然下垂后随镜头升高微微张开 */
+      /* 升高：站定，双臂随镜头升高向外张开（"打开格局"的手势） */
       var open = Math.min(1, p * 1.6);
-      armL.set(-0.30 - open * 0.16, 0.98 - open * 0.10, 0.02);
-      armR.set(0.30 + open * 0.16, 0.98 - open * 0.10, 0.02);
-      legL.set(-0.17, 0, 0); legR.set(0.17, 0, 0);
+      wristL.set(-0.30 - open * 0.20, 0.98 - open * 0.06, 0.02 - open * 0.10);
+      wristR.set(0.30 + open * 0.20, 0.98 - open * 0.06, 0.02 - open * 0.10);
+      elbow = 0.04;
+      ankleL.set(-0.17, 0, 0); ankleR.set(0.17, 0, 0);
+      kneeL = kneeR = 0.03;
       bob = 0.01 * A;
+      headPitch = -0.06 * open;
     } else if (m === 'ramp') {
-      /* 变速：动作峰值处做一次发力的定格——手臂前挥后骤停 */
+      /* 变速：蓄力 → 峰值定格（前臂抬起、身体前倾、前腿蹬出） */
       var peak = p > 0.42 && p < 0.62;
       var drive = Math.min(1, p / 0.45);
       if (peak) {
-        /* 停格姿态：前臂抬起、身体前倾 */
-        armL.set(-0.26, 1.16, -0.22);
-        armR.set(0.26, 1.18, -0.26);
-        legL.set(-0.22, 0.02, 0.20);
-        legR.set(0.18, 0, -0.14);
-        lean = 0.18;
+        wristL.set(-0.26, 1.14, -0.26);
+        wristR.set(0.26, 1.16, -0.30);
+        elbow = 0.10;
+        ankleL.set(-0.24, 0.01, 0.22); ankleR.set(0.16, 0, -0.18);
+        kneeL = 0.12; kneeR = 0.09;
+        spine = 0.20; lean = 0.18; headPitch = 0.05;
         bob = 0.02;
       } else if (p < 0.42) {
-        /* 蓄力：手臂后摆 */
-        armL.set(-0.30, 0.98 - drive * 0.06, 0.30 * drive);
-        armR.set(0.30, 0.98 - drive * 0.06, 0.30 * drive);
+        /* 蓄力：手臂后摆、屈膝下蹲 */
+        wristL.set(-0.30, 0.94 - drive * 0.08, 0.26 * drive);
+        wristR.set(0.30, 0.94 - drive * 0.08, 0.26 * drive);
+        elbow = 0.09;
+        kneeL = kneeR = 0.05 + drive * 0.08;
+        spine = -0.06 * drive;
         lean = -0.08 * drive;
+        bob = -0.03 * drive;
       }
     } else if (m === 'whip') {
-      /* 甩镜：演员做一个快速转身/挥手，配合镜头甩动 */
+      /* 甩镜：转身挥手 */
       var turn = p < 0.5 ? p * 2 : 1;
-      armL.set(-0.30 - 0.20 * turn, 1.02 + 0.10 * turn, 0.10 * turn);
-      armR.set(0.30, 0.98, 0);
+      wristL.set(-0.30 - 0.22 * turn, 1.00 + 0.12 * turn, 0.06 - 0.22 * turn);
+      wristR.set(0.30, 0.98, 0);
+      elbow = 0.08;
       lean = -0.30 * Math.sin(p * Math.PI);
+      twist = -0.34 * Math.sin(p * Math.PI);
+      headPitch = -0.04 * Math.sin(p * Math.PI);
     } else if (m === 'dutch') {
-      /* 荷兰角：演员略显不安，手臂夹紧、重心偏移 */
-      armL.set(-0.22, 1.00, 0.06);
-      armR.set(0.22, 1.00, -0.06);
-      legL.set(-0.13, 0, 0.04);
-      legR.set(0.19, 0, -0.03);
+      /* 荷兰角：不安，手臂夹紧、重心偏移、单膝微屈 */
+      wristL.set(-0.22, 1.00, 0.06);
+      wristR.set(0.22, 1.00, -0.06);
+      elbow = 0.05;
+      ankleL.set(-0.13, 0, 0.04); ankleR.set(0.19, 0, -0.03);
+      kneeL = 0.06; kneeR = 0.03;
       lean = Math.sin(this.t * 2.2) * 0.08;
+      spine = Math.sin(this.t * 2.2) * 0.03;
       bob = 0.008 * A;
     } else if (m === 'neon' || m === 'frame' || m === 'static' || m === 'lightleak') {
-      /* 静态塑形类：演员轻微呼吸感，不做大动作 */
-      var breathe = Math.sin(this.t * 1.8) * 0.02;
-      armL.set(-0.29, 0.99 + breathe, 0.04);
-      armR.set(0.29, 0.99 + breathe, -0.04);
-      legL.set(-0.16, 0, 0.02); legR.set(0.16, 0, -0.02);
+      /* 静态塑形类：呼吸感，肩随呼吸微起伏 */
+      var breathe = Math.sin(this.t * 1.8) * 0.018;
+      wristL.set(-0.29, 0.99 + breathe, 0.03);
+      wristR.set(0.29, 0.99 + breathe, -0.03);
+      elbow = 0.05;
+      ankleL.set(-0.16, 0, 0.02); ankleR.set(0.16, 0, -0.02);
+      kneeL = kneeR = 0.035;
       lean = Math.sin(this.t * 0.9) * 0.04;
       bob = 0.006 * A;
     }
 
-    return { legL: legL, legR: legR, armL: armL, armR: armR, bob: bob, lean: lean };
+    return {
+      ankleL: ankleL, ankleR: ankleR, wristL: wristL, wristR: wristR,
+      kneeL: kneeL, kneeR: kneeR, elbowL: elbow, elbowR: elbow,
+      spine: spine, twist: twist, sideLean: lean * 0.4, headPitch: headPitch,
+      bob: bob, lean: lean
+    };
   };
 
   /* ---------- 摄影师动作：持机步态 + 云台三轴 ---------- */
   Stage.prototype._shooterPerf = function (p, moving) {
     var sh = this.shooter.userData;
-    var shY = sh.shoulderY, hipY = sh.hipY;
     var m = this.mode;
     var A = moving ? 1 : 0;
     /* 摄影师的步伐比演员更小更稳（要保证画面不抖） */
@@ -1004,17 +1488,28 @@
     var swing = Math.sin(ph) * 0.14 * A;
     var bob = Math.abs(Math.sin(ph)) * 0.018 * A;
 
-    var legL = new T.Vector3(-0.12 - swing * 0.4, Math.max(0, Math.sin(ph)) * 0.05 * A, swing);
-    var legR = new T.Vector3(0.12 + swing * 0.4, Math.max(0, -Math.sin(ph)) * 0.05 * A, -swing);
+    var ankleL = new T.Vector3(-0.12 - swing * 0.4, Math.max(0, Math.sin(ph)) * 0.05 * A, swing);
+    var ankleR = new T.Vector3(0.12 + swing * 0.4, Math.max(0, -Math.sin(ph)) * 0.05 * A, -swing);
+    /* 稳定器步态：屈膝更深，重心更低（这是"忍者步"的关键） */
+    var kneeL = 0.07 + Math.max(0, Math.sin(ph)) * 0.04 * A;
+    var kneeR = 0.07 + Math.max(0, -Math.sin(ph)) * 0.04 * A;
 
-    /* 双臂举起持机：双手位置随手法调整（胸前 / 举高 / 贴眼） */
-    var armUp = 1.22, armFwd = 0.20;
-    if (m === 'crane') { armUp = 1.30; armFwd = 0.16; }        // 举高
-    if (m === 'low-angle-hero' || m === 'static') { armUp = 1.16; armFwd = 0.24; }
-    if (m === 'neon') { armUp = 1.20; armFwd = 0.22; }
-    var jitter = moving ? Math.sin(ph * 1.3) * 0.012 : 0;
-    var armL = new T.Vector3(-0.15, armUp + jitter, armFwd);
-    var armR = new T.Vector3(0.15, armUp + jitter, armFwd);
+    /* 双手举机位置：胸前 / 举高 / 贴眼，随手法调整 */
+    var armUp = 1.20, armFwd = -0.20;
+    if (m === 'crane') { armUp = 1.30; armFwd = -0.15; }
+    if (m === 'static' || m === 'dutch') { armUp = 1.16; armFwd = -0.24; }
+    if (m === 'neon') { armUp = 1.19; armFwd = -0.22; }
+    if (m === 'ramp') { armUp = 1.22; armFwd = -0.22; }
+    var jitter = moving ? Math.sin(ph * 1.3) * 0.010 : 0;
+    var wristL = new T.Vector3(-0.15, armUp + jitter, armFwd);
+    var wristR = new T.Vector3(0.15, armUp + jitter, armFwd);
+    /* 肘部明显外张并下沉——真实的双手持稳定器姿势 */
+    var elbow = 0.13;
+
+    /* 躯干：摄影师略含胸、重心下沉 */
+    var spine = 0.06 + (moving ? 0.03 : 0);
+    var twist = 0;
+    var sideLean = 0;
 
     /* 云台三轴：不同运镜的轴动作不同，这是"云台怎么动"的可视化核心 */
     var yaw = 0, roll = 0, pitch = 0;
@@ -1050,8 +1545,38 @@
       roll = Math.sin(ph * 0.6) * 0.02 * A;
     }
 
-    return { legL: legL, legR: legR, armL: armL, armR: armR,
-      bob: bob, yaw: yaw, roll: roll, pitch: pitch };
+    return {
+      ankleL: ankleL, ankleR: ankleR, wristL: wristL, wristR: wristR,
+      kneeL: kneeL, kneeR: kneeR, elbowL: elbow, elbowR: elbow,
+      spine: spine, twist: twist, sideLean: sideLean,
+      bob: bob, yaw: yaw, roll: roll, pitch: pitch
+    };
+  };
+
+  /* ---------- 交互渲染循环 ----------
+     播放结束后如果彻底停掉 rAF，镜头就再也不会重绘，
+     于是"拖拽/滚轮/键盘"全部失效——这正是"播放完不能用自由视角"的根因。
+     这里保留一个轻量循环：仅在需要时（暂停后仍在交互，或姿势有变化）重绘，
+     空闲时不产生额外绘制，兼顾可交互与省电。 */
+  Stage.prototype._ensureIdleLoop = function () {
+    var self = this;
+    if (this._idleRaf) return;
+    this._idleDirty = true;
+    (function tick() {
+      if (!self.ok) { self._idleRaf = 0; return; }
+      self._idleRaf = requestAnimationFrame(tick);
+      if (self.playing) return;                  // 播放中由 _loop 负责
+      if (self._idleDirty) {
+        self._idleDirty = false;
+        self._update(0);
+      }
+    })();
+    this._idleRaf = 1;
+  };
+  /* 标记"需要重绘一帧"（相机被拖动、切换视角等交互时调用） */
+  Stage.prototype.invalidate = function () {
+    this._idleDirty = true;
+    this._ensureIdleLoop();
   };
 
   Stage.prototype._loop = function () {
@@ -1060,7 +1585,15 @@
     this._raf = requestAnimationFrame(function () {
       var dt = self.clock.getDelta();
       self.t += dt * self.speed;
-      if (self.t > self.dur) { self.t = self.dur; self.playing = false; self._update(0, true); self._emitEnd && self._emitEnd(); return; }
+      if (self.t > self.dur) {
+        self.t = self.dur;
+        self.playing = false;
+        self._update(0, true);
+        self._emitEnd && self._emitEnd();
+        /* 播放结束 → 转入可交互的静止状态，镜头仍可自由拖动 */
+        self.invalidate();
+        return;
+      }
       self._update(dt);
       self._loop();
     });

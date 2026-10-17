@@ -353,7 +353,7 @@
      三、AI 运镜编排台
      ============================================================ */
   var stage = null, stageReady = false, plan = null, curMoveIdx = 0, rafProg = 0;
-  var curEnvId = null, curEnvManual = false;
+  var curEnvId = null, curEnvManual = false, curAnimal = 'none';
 
   /* 可切换的预演场景（id 与 scene-env.js / cinematography.js 对齐） */
   var ENV_LIST = [
@@ -467,6 +467,21 @@
       });
     }
 
+    /* 动物：无 / 猫 / 狗 */
+    var animals = $('#ocAnimals');
+    if (animals) {
+      $$('button', animals).forEach(function (b) {
+        b.addEventListener('click', function () {
+          $$('button', animals).forEach(function (x) { x.classList.toggle('on', x === b); });
+          curAnimal = b.dataset.a;
+          if (stage && stage.ok) {
+            stage.setAnimal(curAnimal);
+            stage.invalidate();
+          }
+        });
+      });
+    }
+
     /* 场景环境切换 */
     var envPick = $('#ocEnvPick');
     if (envPick) {
@@ -479,6 +494,9 @@
           curEnvId = b.dataset.env;
           curEnvManual = true;
           stage.setEnvironment(curEnvId);
+          /* 换场景后动物仍需在位（障碍区域已随场景更新） */
+          if (curAnimal && curAnimal !== 'none') stage.setAnimal(curAnimal);
+          stage.invalidate();
           syncEnvButtons();
         });
       });
@@ -510,7 +528,11 @@
       };
       stage.setOrbit('free');
       stage.setMove((plan && plan.demo && plan.demo.mode) || 'dolly');
+      /* 恢复用户此前选择的动物 */
+      if (curAnimal && curAnimal !== 'none') stage.setAnimal(curAnimal);
       stage.reset();
+      /* 进入可交互的静止状态，保证未播放时也能自由调视角 */
+      stage.invalidate();
     } catch (e) {
       var f2 = $('#ocStageFail');
       if (f2) { f2.hidden = false; host.style.display = 'none'; }
