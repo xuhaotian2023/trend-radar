@@ -856,6 +856,243 @@
     return { group: g, light: '通用自然光（建议补充具体场景关键词）', ground: false, obstacles: ob };
   }
 
+  /* ============ 9. 室内摄影棚（带环形灯）============ */
+  function ringStudio() {
+    var g = new (T().Group)();
+    var ob = new Obstacles();
+    var floor = plane(11, 11, 0x1e2534, 0.92); floor.rotation.x = -Math.PI / 2; g.add(floor);
+    g.add(at(plane(9, 3.8, 0x252e42, 0.92), 0, 1.9, -3.8));
+    g.add(at(new (T().LineSegments)(
+      new (T().EdgesGeometry)(new (T().BoxGeometry)(9, 3.8, 9.4)),
+      new (T().LineBasicMaterial)({ color: 0x44587e, transparent: true, opacity: 0.5 })
+    ), 0, 1.9, -0.1));
+
+    /* 环形灯：主播/口播类内容的核心器材 */
+    var ring = new (T().Group)();
+    ring.add(at(new (T().Mesh)(new (T().TorusGeometry)(0.44, 0.035, 10, 28),
+      new (T().MeshBasicMaterial)({ color: 0xfff4d6, transparent: true, opacity: 0.92 })), 0, 0, 0));
+    ring.add(at(new (T().Mesh)(new (T().CircleGeometry)(0.42, 28),
+      new (T().MeshBasicMaterial)({ color: 0xfff4d6, transparent: true, opacity: 0.22 })), 0, 0, 0.01));
+    /* 环形灯支架 */
+    ring.add(at(cyl(0.03, 0.03, 1.2, 0x4a5878, 0.85, 8), 0, -0.85, 0));
+    ring.add(at(cyl(0.26, 0.30, 0.06, 0x4a5878, 0.85, 14), 0, -1.50, 0));
+    ring.position.set(-2.6, 1.7, -1.4);
+    ring.rotation.y = 0.5;
+    g.add(ring);
+    ob.add(-2.6, -1.4, 0.52, '环形灯');
+
+    /* 主播椅：转椅 + 靠背 */
+    var chair = new (T().Group)();
+    chair.add(at(box(0.5, 0.07, 0.5, 0x3a4560, 0.95), 0, 0.48, 0));
+    chair.add(at(box(0.5, 0.55, 0.07, 0x3a4560, 0.9), 0, 0.76, -0.22));
+    [[-0.2, -0.2], [0.2, -0.2], [-0.2, 0.2], [0.2, 0.2]].forEach(function (q) {
+      chair.add(at(cyl(0.022, 0.022, 0.46, 0x2f3a52, 0.9, 6), q[0], 0.23, q[1]));
+    });
+    chair.add(at(cyl(0.22, 0.26, 0.05, 0x2f3a52, 0.9, 14), 0, 0.025, 0));
+    chair.position.set(0, 0, 0.2);
+    g.add(chair);
+    ob.add(0, 0.2, 0.42, '主播椅');
+
+    /* 提词器：斜置的屏 + 支架 */
+    var prompter = new (T().Group)();
+    prompter.add(at(box(0.62, 0.42, 0.03, 0x6b7a9c, 0.9), 0, 0, 0));
+    prompter.add(at(box(0.58, 0.38, 0.01, 0x9fd8ff, 0.35), 0, 0, 0.02));
+    prompter.add(at(cyl(0.02, 0.02, 0.5, 0x4a5878, 0.85, 6), 0, -0.42, 0.05));
+    prompter.position.set(0.9, 1.25, 0.75);
+    prompter.rotation.x = -0.42;
+    prompter.rotation.y = -0.3;
+    g.add(prompter);
+    ob.add(0.9, 0.75, 0.45, '提词器');
+
+    /* 右侧补光：柔光箱 */
+    var fill = new (T().Group)();
+    fill.add(at(box(1.2, 1.2, 0.08, 0xe4eeff, 0.30), 0, 0, 0));
+    fill.add(at(frame(1.2, 1.2, 0xa8bce0, 0.7, 0.04), 0, 0, 0.01));
+    fill.add(at(cyl(0.03, 0.03, 2.2, 0x4a5878, 0.85, 8), 0, -1.15, 0));
+    fill.add(at(cyl(0.24, 0.28, 0.06, 0x4a5878, 0.85, 14), 0, -2.25, 0));
+    fill.position.set(2.7, 1.9, -0.6);
+    fill.rotation.y = -Math.PI / 5;
+    g.add(fill);
+    ob.add(2.7, -0.6, 0.36, '补光灯');
+
+    /* 走位区标记 */
+    g.add(at(markRing(0, 0.9, 1.25, 0.012), 0, 0.012, 0.9));
+
+    return { group: g, light: '环形灯主光 + 右侧柔光箱补光（可控光）', ground: false, obstacles: ob };
+  }
+
+  /* ============ 10. 办公室 / 会议场景 ============ */
+  function office() {
+    var g = new (T().Group)();
+    var ob = new Obstacles();
+    var floor = plane(12, 12, 0x232a38, 0.92); floor.rotation.x = -Math.PI / 2; g.add(floor);
+    for (var f = -5; f <= 5; f++) {
+      g.add(at(box(11, 0.010, 0.02, 0x33405a, 0.45), 0, 0.006, f * 1.1));
+    }
+    g.add(at(plane(12, 3.5, 0x2b3450, 0.88), 0, 1.75, -5.0));
+
+    /* 玻璃隔断：办公室的典型边界 */
+    for (var gl = -4; gl <= 4; gl++) {
+      g.add(at(box(1.6, 0.02, 0.02, 0x5a6c8c, 0.7), gl * 1.6, 0.4, -4.2));
+    }
+    g.add(at(box(11, 0.06, 0.06, 0x5a6c8c, 0.8), 0, 1.2, -4.2));
+    g.add(at(box(11, 0.06, 0.06, 0x5a6c8c, 0.8), 0, 2.4, -4.2));
+
+    /* 会议桌 + 椅子 */
+    var table = new (T().Group)();
+    table.add(at(box(2.6, 0.08, 1.1, 0x4a5468, 0.95), 0, 0.74, 0));
+    table.add(at(box(2.6, 0.7, 0.9, 0x39425a, 0.9), 0, 0.35, 0));
+    [[-1.1, -0.4], [1.1, -0.4], [-1.1, 0.4], [1.1, 0.4]].forEach(function (q) {
+      table.add(at(cyl(0.05, 0.05, 0.72, 0x39425a, 0.9, 8), q[0], 0.36, q[1]));
+    });
+    /* 桌上：笔记本、文件、水杯 */
+    table.add(at(box(0.34, 0.02, 0.24, 0x8c95a8, 0.9), -0.5, 0.79, 0.1));
+    table.add(at(box(0.3, 0.03, 0.22, 0xa8b2c4, 0.85), -0.5, 0.815, 0.1));
+    table.add(at(box(0.28, 0.02, 0.2, 0xd8dce8, 0.8), 0.4, 0.79, -0.1));
+    table.add(at(cyl(0.04, 0.035, 0.09, 0xe8f0f8, 0.9, 10), 0.8, 0.82, 0.2));
+    table.position.set(0, 0, -1.6);
+    g.add(table);
+    ob.add(0, -1.6, 1.5, '会议桌');
+
+    /* 椅子若干 */
+    [[-1.5, -0.4, 0.3], [1.5, -0.4, -0.3], [0, 0.55, Math.PI]].forEach(function (q) {
+      var c = new (T().Group)();
+      c.add(at(box(0.46, 0.06, 0.46, 0x3f4a60, 0.95), 0, 0.46, 0));
+      c.add(at(box(0.46, 0.52, 0.06, 0x3f4a60, 0.92), 0, 0.73, -0.2));
+      [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]].forEach(function (z) {
+        c.add(at(cyl(0.022, 0.022, 0.45, 0x333d52, 0.9, 6), z[0], 0.225, z[1]));
+      });
+      c.position.set(q[0], 0, q[1] + -1.6);
+      c.rotation.y = q[2];
+      g.add(c);
+    });
+
+    /* 白板 + 马克笔 */
+    g.add(at(box(2.2, 1.3, 0.05, 0xe8eef8, 0.92), 2.6, 1.75, -4.9));
+    g.add(at(box(2.2, 0.06, 0.07, 0x8c95a8, 0.8), 2.6, 1.06, -4.9));
+    g.add(at(box(2.2, 0.06, 0.07, 0x8c95a8, 0.8), 2.6, 2.44, -4.9));
+    /* 白板上的示意线条 */
+    for (var wl = 0; wl < 4; wl++) {
+      g.add(at(box(1.4 - wl * 0.2, 0.02, 0.01, 0x6d8fc4, 0.5), 2.3, 2.0 - wl * 0.22, -4.85));
+    }
+
+    /* 办公椅（转椅）在两侧 */
+    [[-3.4, 1.2, 0.6], [3.4, 1.6, -0.6]].forEach(function (q) {
+      var oc = new (T().Group)();
+      oc.add(at(box(0.5, 0.07, 0.5, 0x333d52, 0.95), 0, 0.48, 0));
+      oc.add(at(box(0.5, 0.6, 0.08, 0x333d52, 0.92), 0, 0.8, -0.24));
+      oc.add(at(cyl(0.02, 0.02, 0.4, 0x4a5468, 0.9, 6), 0, 0.24, 0));
+      oc.add(at(cyl(0.28, 0.3, 0.05, 0x333d52, 0.9, 14), 0, 0.025, 0));
+      oc.position.set(q[0], 0, q[1]);
+      oc.rotation.y = q[2];
+      g.add(oc);
+      ob.add(q[0], q[1], 0.4, '办公椅');
+    });
+
+    /* 落地窗光：办公室的自然光 */
+    var win = new (T().Group)();
+    win.add(at(plane(3.6, 2.6, 0xbcd6ff, 0.20), 0, 1.6, 0));
+    win.add(at(frame(3.6, 2.6, 0x5a6c8c, 0.85, 0.07), 0, 1.6, 0.02));
+    win.position.set(-5.0, 0, 0.4);
+    win.rotation.y = Math.PI / 2;
+    g.add(win);
+    var lightPool = plane(3.2, 3.2, 0x9dc4ff, 0.10);
+    lightPool.rotation.x = -Math.PI / 2; at(lightPool, -1.6, 0.012, 0.4);
+    g.add(lightPool);
+
+    /* 走位区标记 */
+    g.add(at(markRing(0, 1.4, 1.3, 0.012), 0, 0.012, 1.4));
+
+    return { group: g, light: '落地窗自然光 + 室内顶光', ground: false, obstacles: ob };
+  }
+
+  /* ============ 11. 街道日景 ============ */
+  function streetDay() {
+    var g = new (T().Group)();
+    var ob = new Obstacles();
+    var road = plane(12, 12, 0x2a3038, 0.94); road.rotation.x = -Math.PI / 2; g.add(road);
+    /* 人行道与路缘 */
+    g.add(at(box(0.85, 0.13, 12, 0x39404c, 0.88), -2.8, 0.065, 0));
+    g.add(at(box(0.85, 0.13, 12, 0x39404c, 0.88), 3.8, 0.065, 0));
+    /* 斑马线 */
+    for (var z = -2.2; z <= 2.2; z += 0.75) {
+      g.add(at(box(1.5, 0.014, 0.34, 0xd8dce4, 0.55), 0, 0.014, z));
+    }
+    /* 车道中线 */
+    for (var zc = -5; zc <= 5; zc += 1.6) {
+      g.add(at(box(0.12, 0.012, 0.7, 0xc8ccd4, 0.4), 0.9, 0.012, zc));
+    }
+
+    /* 沿街建筑：日景用暖灰调 */
+    var buildings = [
+      { x: -4.0, z: -3.6, w: 1.8, h: 4.6, d: 2.2, c: 0x4a5468 },
+      { x: -3.7, z: 0.4, w: 1.6, h: 3.4, d: 2.0, c: 0x424a5c },
+      { x: -4.2, z: 3.6, w: 1.5, h: 2.8, d: 1.8, c: 0x3c4454 },
+      { x: 4.6, z: -2.8, w: 2.0, h: 5.4, d: 2.4, c: 0x505a6e },
+      { x: 4.3, z: 1.4, w: 1.7, h: 3.6, d: 2.0, c: 0x46506a }
+    ];
+    buildings.forEach(function (b) {
+      g.add(at(box(b.w, b.h, b.d, b.c, 0.96), b.x, b.h / 2, b.z));
+      g.add(at(new (T().LineSegments)(
+        new (T().EdgesGeometry)(new (T().BoxGeometry)(b.w, b.h, b.d)),
+        new (T().LineBasicMaterial)({ color: 0x66718c, transparent: true, opacity: 0.6 })
+      ), b.x, b.h / 2, b.z));
+      /* 日景窗户：明亮、以亮色为主 */
+      for (var i = 0; i < 10; i++) {
+        if (Math.random() > 0.55) continue;
+        var win = box(0.20, 0.24, 0.03, Math.random() > 0.5 ? 0xdce8f5 : 0xffe9c8, 0.75);
+        at(win,
+          b.x + (Math.random() - 0.5) * (b.w * 0.66),
+          0.9 + Math.random() * (b.h - 1.8),
+          b.z + (b.x < 0 ? b.d / 2 + 0.02 : -b.d / 2 - 0.02));
+        g.add(win);
+      }
+      ob.add(b.x, b.z, Math.sqrt(b.w * b.w + b.d * b.d) / 2, '建筑');
+    });
+
+    /* 招牌：日景用非发光招牌（布面/亚克力） */
+    [
+      { x: -3.05, y: 2.4, z: -3.6, w: 0.06, h: 1.0, c: 0x3a6ea8 },
+      { x: 3.55, y: 2.8, z: -2.8, w: 0.06, h: 1.3, c: 0x8a5a3a },
+      { x: 3.55, y: 1.9, z: -1.6, w: 1.2, h: 0.5, c: 0x4a7a5a }
+    ].forEach(function (n) {
+      g.add(at(box(n.w, n.h, 0.05, n.c, 0.92), n.x, n.y, n.z));
+    });
+
+    /* 路灯（日间不发光，只做结构） */
+    [[-3.2, -3.4], [4.2, 2.8]].forEach(function (q) {
+      g.add(at(cyl(0.06, 0.07, 3.4, 0x5a6478, 0.92, 8), q[0], 1.7, q[1]));
+      g.add(at(box(0.9, 0.06, 0.06, 0x5a6478, 0.85), q[0] + (q[0] < 0 ? 0.45 : -0.45), 3.36, q[1]));
+      g.add(at(cyl(0.20, 0.06, 0.18, 0x6a748c, 0.9, 12), q[0] + (q[0] < 0 ? 0.9 : -0.9), 3.3, q[1]));
+      ob.add(q[0], q[1], 0.26, '路灯');
+    });
+
+    /* 树木：行道树，日景的绿色 */
+    [[-3.0, 2.0, 0.9], [4.0, -1.2, 1.1]].forEach(function (q) {
+      var tree = new (T().Group)();
+      tree.add(at(cyl(0.09, 0.13, 2.0, 0x5a4a38, 0.95, 8), 0, 1.0, 0));
+      [0, 1].forEach(function (k) {
+        tree.add(at(cyl(0.72 - k * 0.16, 0.92 - k * 0.16, 0.52, 0x3d6b46, 0.78, 12), 0, 2.2 + k * 0.34, 0));
+      });
+      tree.position.set(q[0], 0, q[1]);
+      tree.scale.set(q[2], q[2], q[2]);
+      g.add(tree);
+      ob.add(q[0], q[1], 0.4, '树');
+    });
+
+    /* 远景天际线 */
+    for (var sf = 0; sf < 14; sf++) {
+      var sh = 2.4 + Math.random() * 3.6;
+      g.add(at(box(0.9 + Math.random() * 1.2, sh, 1.0, 0x4e586c, 0.9),
+        -9 + sf * 1.3, sh / 2 - 0.5, -6.8 - Math.random() * 1.6));
+    }
+
+    /* 走位区标记 */
+    g.add(at(markRing(0, 0.6, 1.45, 0.012), 0, 0.012, 0.6));
+
+    return { group: g, light: '日间自然光 · 散射光、阴影偏硬', ground: false, obstacles: ob };
+  }
+
   /* 场景 id → 构造器。id 与 cinematography.js 的 SCENES 保持一致 */
   var ENVS = {
     'indoor-window': indoorWindow,
@@ -866,7 +1103,126 @@
     'rain-reflect': rainReflect,
     'outdoor-golden': goldenHour,
     'blue-hour': goldenHour,
-    'generic': generic
+    'generic': generic,
+    'ring-studio': ringStudio,
+    'office': office,
+    'street-day': streetDay
+  };
+
+  /* ============ 天气效果（叠加在任意场景之上）============
+     天气作为独立 Group 叠加，不依赖具体场景，因此"夜景街头 + 雨"
+     "室内窗边 + 雪"这类组合都能成立。
+     每种天气返回 { group, light, desc }，light 会并入场景光线说明。 */
+  var WEATHER = {
+    'clear': {
+      name: '晴朗', desc: '光线稳定，阴影锐利',
+      build: function () { return new (T().Group)(); }        // 空组，占位
+    },
+    'rain': {
+      name: '降雨', desc: '地面反光增强，需注意保护器材',
+      build: function () {
+        var g = new (T().Group)();
+        var matR = new (T().MeshBasicMaterial)({ color: 0xa8c8e8, transparent: true, opacity: 0.34 });
+        var n = 150;
+        for (var i = 0; i < n; i++) {
+          var d = new (T().Mesh)(new (T().BoxGeometry)(0.011, 0.30, 0.011), matR);
+          var ang = Math.random() * Math.PI * 2;
+          var rad = 1.2 + Math.random() * 5.0;
+          d.position.set(Math.cos(ang) * rad, Math.random() * 5.0, Math.sin(ang) * rad);
+          d.rotation.z = 0.18;
+          d.userData.fall = 3.6 + Math.random() * 1.6;
+          d.userData.x = d.position.x; d.userData.z = d.position.z;
+          g.add(d);
+        }
+        /* 地面湿亮：一大块低透明度反光 */
+        var wet = new (T().Mesh)(
+          new (T().PlaneGeometry)(12, 12),
+          new (T().MeshBasicMaterial)({ color: 0x2e5678, transparent: true, opacity: 0.20 })
+        );
+        wet.rotation.x = -Math.PI / 2; wet.position.y = 0.004;
+        g.add(wet);
+        g.userData.kind = 'rain';
+        return g;
+      }
+    },
+    'snow': {
+      name: '降雪', desc: '色温偏冷，需补暖光保持肤色',
+      build: function () {
+        var g = new (T().Group)();
+        var matS = new (T().MeshBasicMaterial)({ color: 0xffffff, transparent: true, opacity: 0.78 });
+        var n = 130;
+        for (var i = 0; i < n; i++) {
+          var s = new (T().Mesh)(new (T().SphereGeometry)(0.022, 6, 5), matS);
+          var ang = Math.random() * Math.PI * 2;
+          var rad = 1.0 + Math.random() * 5.0;
+          s.position.set(Math.cos(ang) * rad, Math.random() * 5.0, Math.sin(ang) * rad);
+          s.userData.fall = 0.5 + Math.random() * 0.5;
+          s.userData.sway = Math.random() * Math.PI * 2;
+          s.userData.x = s.position.x; s.userData.z = s.position.z;
+          g.add(s);
+        }
+        /* 地面积雪 */
+        var cover = new (T().Mesh)(
+          new (T().PlaneGeometry)(12, 12),
+          new (T().MeshBasicMaterial)({ color: 0xdfe9f5, transparent: true, opacity: 0.20 })
+        );
+        cover.rotation.x = -Math.PI / 2; cover.position.y = 0.004;
+        g.add(cover);
+        g.userData.kind = 'snow';
+        return g;
+      }
+    },
+    'fog': {
+      name: '雾气', desc: '空气透视强，适合层次与纵深',
+      build: function () {
+        var g = new (T().Group)();
+        /* 三层半透明雾片，远近不同、透明度不同，形成体积雾感 */
+        var layers = [
+          { y: 0.5, r: 5.5, o: 0.05, c: 0xc8d4e8 },
+          { y: 1.1, r: 6.2, o: 0.045, c: 0xb8c8e0 },
+          { y: 1.9, r: 7.0, o: 0.04, c: 0xa8bcd8 }
+        ];
+        layers.forEach(function (L) {
+          var m = new (T().Mesh)(
+            new (T().PlaneGeometry)(L.r * 2, L.r * 1.3),
+            new (T().MeshBasicMaterial)({ color: L.c, transparent: true, opacity: L.o, depthWrite: false })
+          );
+          /* 竖立的雾片：面向相机方向的公告板效果由 billboard 实现，这里简化为一组固定朝向 */
+          m.position.set(0, L.y, 0.6);
+          g.add(m);
+        });
+        g.userData.kind = 'fog';
+        return g;
+      }
+    },
+    'sunset': {
+      name: '黄昏逆光', desc: '低角度逆光，轮廓光明显，注意补面',
+      build: function () {
+        var g = new (T().Group)();
+        /* 太阳盘 + 光晕 */
+        var sun = new (T().Mesh)(
+          new (T().CircleGeometry)(0.5, 24),
+          new (T().MeshBasicMaterial)({ color: 0xffb066, transparent: true, opacity: 0.55 })
+        );
+        sun.position.set(-2.2, 1.7, -6.2);
+        g.add(sun);
+        var glow = new (T().Mesh)(
+          new (T().CircleGeometry)(1.4, 24),
+          new (T().MeshBasicMaterial)({ color: 0xff9a4a, transparent: true, opacity: 0.16 })
+        );
+        glow.position.copy(sun.position);
+        g.add(glow);
+        /* 地面暖光带 */
+        var warm = new (T().Mesh)(
+          new (T().PlaneGeometry)(9, 3.0),
+          new (T().MeshBasicMaterial)({ color: 0xffb877, transparent: true, opacity: 0.11 })
+        );
+        warm.rotation.x = -Math.PI / 2; warm.position.set(-0.6, 0.005, 0.2);
+        g.add(warm);
+        g.userData.kind = 'sunset';
+        return g;
+      }
+    }
   };
 
   window.GS_ENV = {
@@ -878,6 +1234,20 @@
       catch (e) { try { return ENVS['generic'](); } catch (e2) { return null; } }
     },
     has: function (sceneId) { return !!ENVS[sceneId]; },
-    ids: function () { return Object.keys(ENVS); }
+    ids: function () { return Object.keys(ENVS); },
+    /* 天气 */
+    weather: function (key) {
+      var w = WEATHER[key];
+      if (!w) return null;
+      try { return { group: w.build(), name: w.name, desc: w.desc }; }
+      catch (e) { return null; }
+    },
+    weatherList: function () {
+      return Object.keys(WEATHER).map(function (k) {
+        return { id: k, name: WEATHER[k].name, desc: WEATHER[k].desc };
+      });
+    },
+    weatherName: function (key) { return (WEATHER[key] || {}).name || ''; },
+    weatherDesc: function (key) { return (WEATHER[key] || {}).desc || ''; }
   };
 })();

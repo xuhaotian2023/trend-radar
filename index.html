@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>光溯 GUANGSU · 视频热点捕捉与分析平台</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='none' stroke='%236d5efc' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%2322d3ee' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='%2322d3ee'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="assets/guangsu.css?v=20261019a">
+<link rel="stylesheet" href="assets/guangsu.css?v=20261021a">
 <script src="./_shared/js/tailwind.js"></script>
 <script>
   /* Tailwind Play CDN（本地内置，离线可用）：关闭 preflight，避免重置既有设计系统样式；
@@ -414,8 +414,33 @@
                 <button data-a="cat">猫</button>
                 <button data-a="dog">狗</button>
               </div>
+              <span class="oc-view-label">天气</span>
+              <div class="oc-views" id="ocWeather">
+                <button data-w="clear" class="on">晴朗</button>
+                <button data-w="rain">降雨</button>
+                <button data-w="snow">降雪</button>
+                <button data-w="fog">雾气</button>
+                <button data-w="sunset">黄昏逆光</button>
+              </div>
             </div>
-            <p class="oc-modehint" id="ocModeHint">拖动旋转 · 滚轮缩放 · 右键平移</p>
+            <div class="oc-ctrl">
+              <span class="oc-view-label">演员</span>
+              <div class="oc-views oc-count" id="ocActorCount">
+                <button data-n="1" class="on">1</button>
+                <button data-n="2">2</button>
+                <button data-n="3">3</button>
+                <button data-n="4">4</button>
+              </div>
+              <span class="oc-view-label">摄影师</span>
+              <div class="oc-views oc-count" id="ocShooterCount">
+                <button data-n="1" class="on">1</button>
+                <button data-n="2">2</button>
+                <button data-n="3">3</button>
+                <button data-n="4">4</button>
+              </div>
+              <button class="oc-btn ghost" id="ocResetPos" title="清除手动拖动的位置偏移">重置位置</button>
+            </div>
+            <p class="oc-modehint" id="ocModeHint">拖动旋转 · 滚轮缩放 · 右键平移 · <b>直接拖动角色可调整位置</b></p>
             <div class="oc-progress">
               <div class="oc-bar"><i id="ocBarFill"></i></div>
               <span class="oc-phase" id="ocPhase">等待生成方案</span>
@@ -521,19 +546,19 @@
 </footer>
 
 <script src="./_shared/js/echarts.min.js"></script>
-<script src="assets/data.js?v=20261019a"></script>
-<script src="assets/live.js?v=20261019a"></script>
-<script src="assets/predict.js?v=20261019a"></script>
+<script src="assets/data.js?v=20261021a"></script>
+<script src="assets/live.js?v=20261021a"></script>
+<script src="assets/predict.js?v=20261021a"></script>
 <script src="assets/charts.js?v=20261016b"></script>
-<script src="assets/cinematography.js?v=20261019a"></script>
-<script src="assets/orchestrator.js?v=20261019a"></script>
-<script src="assets/app.js?v=20261019a"></script>
-<script src="assets/features.js?v=20261019a"></script>
+<script src="assets/cinematography.js?v=20261021a"></script>
+<script src="assets/orchestrator.js?v=20261021a"></script>
+<script src="assets/app.js?v=20261021a"></script>
+<script src="assets/features.js?v=20261021a"></script>
 <script src="./_shared/js/three.min.js" defer></script>
 <script src="./_shared/js/motion.min.js" defer></script>
-<script src="assets/scene-env.js?v=20261019a" defer></script>
-<script src="assets/stage3d.js?v=20261019a" defer></script>
-<script src="assets/gs-ui.js?v=20261019a" defer></script>
-<script src="assets/gs-fx.js?v=20261019a" defer></script>
+<script src="assets/scene-env.js?v=20261021a" defer></script>
+<script src="assets/stage3d.js?v=20261021a" defer></script>
+<script src="assets/gs-ui.js?v=20261021a" defer></script>
+<script src="assets/gs-fx.js?v=20261021a" defer></script>
 </body>
 </html>

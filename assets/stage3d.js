@@ -276,8 +276,16 @@
        手柄 grip → 偏航轴 yaw（水平旋转）→ 横滚轴 roll（左右倾斜）
        → 俯仰轴 pitch（上下俯仰）→ 快装板 → 机身 → 镜头 → 遮光罩
      三个轴各自成组，运行时按运镜需要独立转动，因此云台动作肉眼可见。 */
+  /* ---------- 精细摄制装备：三轴云台 + 机身 + 镜头 + 监视屏 + 跟焦轮 ----------
+     结构（自下而上）：
+       手柄 grip → 偏航轴 yaw（水平旋转）→ 横滚轴 roll（左右倾斜）
+       → 俯仰轴 pitch（上下俯仰）→ 快装板 → 机身 → 镜头 → 遮光罩
+     三个轴各自成组，运行时按运镜需要独立转动，因此云台动作肉眼可见。
+
+     朝向约定（重要，与人物统一）：rig 的"镜头朝向"为 +Z。
+     也就是 lensBarrel.position.z 用正值，遮光罩在最前方。
+     人物脚掌也是 +Z，因此"人朝哪、镜头就朝哪"，两者绝不会出现反向。 */
   function makeRig(color) {
-    
     var rig = new T.Group();
 
     var metal = new T.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.72 });
@@ -340,36 +348,37 @@
     var hotShoe = new T.Mesh(new T.BoxGeometry(0.10, 0.014, 0.06), dark);
     hotShoe.position.y = 0.064;
     body.add(hotShoe);
-    /* 翻转屏：机身背面的一块亮面，随云台一起转，能看出朝向 */
+    /* 翻转屏：机身背面的一块亮面，随云台一起转，能看出朝向。
+       屏在机身后方（-Z），因为镜头朝 +Z。 */
     var screen = new T.Mesh(new T.PlaneGeometry(0.105, 0.075), glass);
-    screen.position.set(0, 0.004, 0.103);
-    screen.rotation.y = Math.PI;
+    screen.position.set(0, 0.004, -0.103);
+    screen.rotation.y = 0;
     body.add(screen);
     /* 机身顶部的录制指示灯 */
     var rec = new T.Mesh(new T.SphereGeometry(0.010, 8, 6), new T.MeshBasicMaterial({ color: 0xfb7185 }));
-    rec.position.set(0.058, 0.052, -0.055);
+    rec.position.set(0.058, 0.052, 0.055);
     body.add(rec);
-    /* 镜头：镜筒 + 变焦环 + 遮光罩 */
+    /* 镜头：镜筒 + 变焦环 + 镜片 + 遮光罩（全部朝 +Z，与人物正面一致） */
     var lensBarrel = new T.Mesh(new T.CylinderGeometry(0.042, 0.046, 0.135, 16), dark);
     lensBarrel.rotation.x = Math.PI / 2;
-    lensBarrel.position.z = -0.165;
+    lensBarrel.position.z = 0.165;
     body.add(lensBarrel);
     var zoomRing = new T.Mesh(new T.CylinderGeometry(0.049, 0.049, 0.022, 16), accent);
     zoomRing.rotation.x = Math.PI / 2;
-    zoomRing.position.z = -0.145;
+    zoomRing.position.z = 0.145;
     body.add(zoomRing);
     var lensGlass = new T.Mesh(new T.CylinderGeometry(0.038, 0.038, 0.008, 16), glass);
     lensGlass.rotation.x = Math.PI / 2;
-    lensGlass.position.z = -0.234;
+    lensGlass.position.z = 0.234;
     body.add(lensGlass);
     var hood = new T.Mesh(new T.CylinderGeometry(0.055, 0.046, 0.05, 16, 1, true), dark);
     hood.rotation.x = Math.PI / 2;
-    hood.position.z = -0.246;
+    hood.position.z = 0.246;
     body.add(hood);
     /* 跟焦轮：机身右侧的小圆盘，转动可见 */
     var ffWheel = new T.Mesh(new T.CylinderGeometry(0.030, 0.030, 0.014, 14), accent);
     ffWheel.rotation.z = Math.PI / 2;
-    ffWheel.position.set(0.086, -0.028, 0.020);
+    ffWheel.position.set(0.086, -0.028, -0.020);
     body.add(ffWheel);
     pitchGrp.add(body);
 
@@ -382,13 +391,27 @@
     return rig;
   }
 
-  /* ---------- 摄影师：火柴人 + 精细摄制装备 ---------- */
+  /* ---------- 摄影师：火柴人 + 精细摄制装备 ----------
+     关键修正（原实现的问题）：
+       1) 装备原来挂在人物"根节点"上，位置写死在 (0, y-1.36, 0)，
+          于是走路摆臂时相机不跟着手走，看起来像飘在身前。
+       2) 各模型肢体朝向不统一：火柴人脚掌朝 +Z，而镜头原来朝 -Z，
+          导致"人朝这边、镜头朝那边"，方向感错乱。
+     现在的做法：
+       · 建立一个 rigAnchor 节点，作为"双手握持点"的代理容器；
+       · 每帧由 _shooterPerf 给出的双手腕位置驱动 rigAnchor 的位置，
+         并把 rigAnchor 放到双手连线的中点，让相机真正长在手上；
+       · 统一朝向约定：整个模型"正面"一律为 +Z（脚掌朝 +Z、镜头朝 +Z），
+          因此旋转角统一用 atan2(dx, dz)，人物转向与镜头朝向完全一致。 */
   function makeShooter(color) {
     var g = makeStick(color, { scale: 1.0 });
+    /* rigAnchor：装备挂载点。局部坐标 = 双手握持位置，
+       由 applySkeleton 之后按腕部实际位置更新，因此一定跟手。 */
     var camGrp = new T.Group();
     camGrp.add(makeRig(color));
     g.add(camGrp);
     g.userData.camGrp = camGrp;
+    g.userData.rigAnchor = camGrp;
     return g;
   }
 
@@ -645,37 +668,32 @@
          环境作为独立 Group 挂载，切换场景时只替换这一组，火柴人与轨迹不受影响。 */
       this.envGroup = null;
 
-      /* 演员（被拍对象） */
-      this.actor = makeStick(0x7ef3ff, { scale: 1.0 });
-      this.actor.position.set(0, 0, 0);
-      this.scene.add(this.actor);
+      /* ---- 角色编制 ----
+         演员与摄影师都以"数组"管理，支持多人同框：
+           actors[i]   被拍对象（含标签、头顶箭头）
+           shooters[i] 拍摄者（含云台装备与视锥）
+         this.actor / this.shooter 仍指向第 0 个，作为"主视角目标"，
+         这样既支持多人，又不破坏原有单角色的镜头逻辑。 */
+      this.actors = [];
+      this.shooters = [];
+      this.actorTracks = [];
+      this.camTracks = [];
+      this.actorFlags = [];
+      this.actorLabels = [];
+      this.shooterLabels = [];
 
-      /* 摄影师 */
-      this.shooter = makeShooter(0xffb75e);
-      this.scene.add(this.shooter);
+      this.ACTOR_COLORS = [0x7ef3ff, 0xa78bfa, 0x5eead4, 0xfbbf24];
+      this.SHOOTER_COLORS = [0xffb75e, 0xf472b6, 0x93c5fd, 0xfca5a5];
 
-      /* 视锥挂在摄影师的装备上 */
-      this.frustum = makeFrustum(0x6d5efc);
-      this.shooter.userData.camGrp.add(this.frustum);
+      /* 主演员（索引 0） */
+      this.actor = this._addActor();
+      /* 主摄影师（索引 0，带云台与视锥） */
+      this.shooter = this._addShooter();
+      this.frustum = this.shooter.userData.frustum;
 
-      /* 轨迹 */
-      this.actorTrack = makeTrack(0x22d3ee);
-      this.camTrack = makeTrack(0xffb75e);
-      this.scene.add(this.actorTrack);
-      this.scene.add(this.camTrack);
-
-      /* 主体标记：演员头顶箭头 + 身份标签，强调"这是被拍的人" */
-      var coneMat = new T.MeshBasicMaterial({ color: 0x7ef3ff, transparent: true, opacity: 0.75 });
-      this.actorFlag = new T.Mesh(new T.ConeGeometry(0.10, 0.22, 4), coneMat);
-      this.actorFlag.position.y = 1.95;
-      this.actorFlag.rotation.x = Math.PI;
-      this.scene.add(this.actorFlag);
-
-      /* 身份标签：用 Sprite 在火柴人上方显示"演员 / 摄影师"，便于教学辨识 */
-      this.actorLabel = makeLabel('演员', '#7ef3ff');
-      this.shooterLabel = makeLabel('摄影师', '#ffb75e');
-      if (this.actorLabel) this.scene.add(this.actorLabel);
-      if (this.shooterLabel) this.scene.add(this.shooterLabel);
+      /* 手动位置偏移：用户在 3D 视图里拖动后记录在此，
+         作为自动走位之上的叠加，实现"可自主调整位置"。 */
+      this.manualOffset = { a: [], s: [] };   // a[i] = {x,z} 相对自动位置的偏移
 
       /* 动物设置：默认无，由 setAnimal 决定是否加入 */
       this.animal = null;
@@ -683,6 +701,7 @@
       this.animalLabel = null;
 
       this._bindOrbit();
+      this._bindPickDrag();      // 支持在 3D 视图里直接拖动角色调位置
       this._resize();
       this.syncSize();          // 布局未就绪时持续重试，保证绘制缓冲与容器一致
       /* 容器尺寸变化（例如父级从 hidden 变为可见）时自动同步绘制缓冲。
@@ -714,6 +733,101 @@
     this.camera.lookAt(this.target);
   };
 
+  /* ---------- 手动拖拽调整角色位置 ----------
+     在 3D 视图里直接拖动某个角色，把它挪到想要的位置。
+     做法：按下时用射线找出点到的是哪个角色，拖动时把射线与地面的交点
+     作为目标点；位移以"相对自动走位的偏移"记录，因此播放/切手法时
+     手动调整依然生效，不会被自动走位覆盖。
+     仅左键、且不与其他交互冲突（飞行模式由飞行接管）。 */
+  Stage.prototype._bindPickDrag = function () {
+    var self = this, el = this.renderer.domElement;
+    var drag = null;
+    var ray = new T.Raycaster();
+    var groundPlane = new T.Plane(new T.Vector3(0, 1, 0), 0);
+
+    function pickRole(clientX, clientY) {
+      var rect = el.getBoundingClientRect();
+      var nx = ((clientX - rect.left) / rect.width) * 2 - 1;
+      var ny = -((clientY - rect.top) / rect.height) * 2 + 1;
+      ray.setFromCamera(new T.Vector2(nx, ny), self.camera);
+      /* 依次检测各角色的头/躯干，命中哪个就拖哪个 */
+      var lists = [{ arr: self.actors, kind: 'a' }, { arr: self.shooters, kind: 's' }];
+      for (var i = 0; i < lists.length; i++) {
+        var arr = lists[i].arr;
+        for (var j = 0; j < arr.length; j++) {
+          var fig = arr[j];
+          if (!fig || !fig.parent) continue;
+          var head = fig.userData.head;
+          if (head && ray.intersectObject(head, false).length) {
+            return { kind: lists[i].kind, idx: j };
+          }
+          /* 躯干近似：用整体包围盒再兜一次 */
+          var hits = ray.intersectObject(fig, true);
+          if (hits.length) return { kind: lists[i].kind, idx: j };
+        }
+      }
+      return null;
+    }
+
+    el.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0) return;
+      /* 自由飞行模式下不拖角色（避免与视角操作打架） */
+      if ((self.camMode || 'orbit') === 'fly') return;
+      var hit = pickRole(e.clientX, e.clientY);
+      if (!hit) return;
+      e.preventDefault();
+      e.stopPropagation();
+      try { el.setPointerCapture(e.pointerId); } catch (err) {}
+      drag = hit;
+      el.style.cursor = 'move';
+      /* 高亮：给被拖的角色加一个地面指示环 */
+      self._dragRing = new T.Mesh(
+        new T.RingGeometry(0.34, 0.40, 28),
+        new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, side: T.DoubleSide })
+      );
+      self._dragRing.rotation.x = -Math.PI / 2;
+      self.scene.add(self._dragRing);
+    });
+
+    el.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var rect = el.getBoundingClientRect();
+      var nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      var ny = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      ray.setFromCamera(new T.Vector2(nx, ny), self.camera);
+      var pt = new T.Vector3();
+      if (!ray.ray.intersectPlane(groundPlane, pt)) return;
+      /* 越界保护：不许拖出场地 */
+      var lim = 5.2;
+      pt.x = Math.max(-lim, Math.min(lim, pt.x));
+      pt.z = Math.max(-lim, Math.min(lim, pt.z));
+      /* 记录为"相对该角色当前自动位置的偏移" */
+      var st = self._compute(self.dur > 0 ? Math.min(1, self.t / self.dur) : 0);
+      var base = drag.kind === 'a'
+        ? st.all.actors[Math.min(drag.idx, st.all.actors.length - 1)].pos
+        : st.all.shooters[Math.min(drag.idx, st.all.shooters.length - 1)].pos;
+      var list = drag.kind === 'a' ? self.manualOffset.a : self.manualOffset.s;
+      if (!list[drag.idx]) list[drag.idx] = { x: 0, z: 0 };
+      list[drag.idx].x = pt.x - base.x;
+      list[drag.idx].z = pt.z - base.z;
+      if (self._dragRing) self._dragRing.position.set(pt.x, 0.02, pt.z);
+      self.invalidate();
+    });
+
+    ['pointerup', 'pointercancel'].forEach(function (ev) {
+      el.addEventListener(ev, function () {
+        if (!drag) return;
+        drag = null;
+        el.style.cursor = 'grab';
+        if (self._dragRing) {
+          self.scene.remove(self._dragRing);
+          self._dragRing = null;
+        }
+      });
+    });
+  };
+
+  /* ---------- 环绕/飞行视角的鼠标与键盘绑定 ---------- */
   Stage.prototype._bindOrbit = function () {
     var self = this, el = this.renderer.domElement;
     var drag = null;
@@ -879,6 +993,119 @@
     if (down) this.invalidate();
   };
 
+  /* ---------- 角色编制：动态增删演员 / 摄影师 ---------- */
+  Stage.prototype._addActor = function () {
+    var idx = this.actors.length;
+    var color = this.ACTOR_COLORS[idx % this.ACTOR_COLORS.length];
+    var a = makeStick(color, { scale: 1.0 });
+    this.scene.add(a);
+    this.actors.push(a);
+
+    var tr = makeTrack(color);
+    this.scene.add(tr);
+    this.actorTracks.push(tr);
+
+    var flag = new T.Mesh(
+      new T.ConeGeometry(0.10, 0.22, 4),
+      new T.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.75 })
+    );
+    flag.position.y = 1.95;
+    flag.rotation.x = Math.PI;
+    this.scene.add(flag);
+    this.actorFlags.push(flag);
+
+    var lb = makeLabel('演员 ' + (idx + 1), '#' + ('00000' + color.toString(16)).slice(-6));
+    if (lb) this.scene.add(lb);
+    this.actorLabels.push(lb);
+    return a;
+  };
+  Stage.prototype._addShooter = function () {
+    var idx = this.shooters.length;
+    var color = this.SHOOTER_COLORS[idx % this.SHOOTER_COLORS.length];
+    var s = makeShooter(color);
+    this.scene.add(s);
+    this.shooters.push(s);
+
+    var tr = makeTrack(color);
+    this.scene.add(tr);
+    this.camTracks.push(tr);
+
+    var lb = makeLabel('摄影师 ' + (idx + 1), '#' + ('00000' + color.toString(16)).slice(-6));
+    if (lb) this.scene.add(lb);
+    this.shooterLabels.push(lb);
+
+    /* 视锥只给主摄影师（索引 0）挂，避免多个视锥互相遮挡看不清 */
+    if (idx === 0) {
+      var fr = makeFrustum(0x6d5efc);
+      s.userData.camGrp.add(fr);
+      s.userData.frustum = fr;
+    } else {
+      s.userData.frustum = null;
+    }
+    return s;
+  };
+  Stage.prototype._disposeFigure = function (fig, tracks, flags, labels, idx) {
+    this.scene.remove(fig);
+    fig.traverse(function (o) {
+      if (o.geometry) { try { o.geometry.dispose(); } catch (e) {} }
+      if (o.material) {
+        var ms = Array.isArray(o.material) ? o.material : [o.material];
+        ms.forEach(function (m) { try { m.dispose(); } catch (e) {} });
+      }
+    });
+    if (tracks && tracks[idx]) { this.scene.remove(tracks[idx]); }
+    if (flags && flags[idx]) { this.scene.remove(flags[idx]); }
+    if (labels && labels[idx]) { this.scene.remove(labels[idx]); }
+  };
+
+  /* 设置演员 / 摄影师数量（0~4）。数量变化时重建对应角色，
+     并重置手动位置偏移，避免索引错位。 */
+  Stage.prototype.setCastCount = function (nActor, nShooter) {
+    if (!this.ok) return false;
+    nActor = Math.max(1, Math.min(4, nActor | 0));
+    nShooter = Math.max(1, Math.min(4, nShooter | 0));
+
+    /* 演员 */
+    while (this.actors.length > nActor) {
+      var i = this.actors.length - 1;
+      this._disposeFigure(this.actors[i], this.actorTracks, this.actorFlags, this.actorLabels, i);
+      this.actors.pop(); this.actorTracks.pop(); this.actorFlags.pop(); this.actorLabels.pop();
+    }
+    while (this.actors.length < nActor) this._addActor();
+
+    /* 摄影师 */
+    while (this.shooters.length > nShooter) {
+      var j = this.shooters.length - 1;
+      this._disposeFigure(this.shooters[j], this.camTracks, null, this.shooterLabels, j);
+      this.shooters.pop(); this.camTracks.pop(); this.shooterLabels.pop();
+    }
+    while (this.shooters.length < nShooter) this._addShooter();
+
+    /* 主角色引用复位（this.shooter 变了，视锥引用也要跟着换） */
+    this.actor = this.actors[0];
+    this.shooter = this.shooters[0];
+    this.frustum = this.shooter.userData.frustum;
+
+    /* 手动偏移按新数量裁剪/补齐 */
+    this.manualOffset.a = this.manualOffset.a.slice(0, nActor);
+    this.manualOffset.s = this.manualOffset.s.slice(0, nShooter);
+    while (this.manualOffset.a.length < nActor) this.manualOffset.a.push({ x: 0, z: 0 });
+    while (this.manualOffset.s.length < nShooter) this.manualOffset.s.push({ x: 0, z: 0 });
+
+    this._update(0, true);
+    return true;
+  };
+  Stage.prototype.castInfo = function () {
+    return { actors: this.actors.length, shooters: this.shooters.length };
+  };
+  /* 清除所有手动位置偏移，恢复自动走位 */
+  Stage.prototype.resetManualOffsets = function () {
+    this.manualOffset.a.forEach(function (o) { o.x = 0; o.z = 0; });
+    this.manualOffset.s.forEach(function (o) { o.x = 0; o.z = 0; });
+    this._update(0, true);
+    this.invalidate();
+  };
+
   Stage.prototype._resize = function () {
     if (!this._built) return;
     var w = this.host.clientWidth || 0, h = this.host.clientHeight || 0;
@@ -950,6 +1177,35 @@
   };
   Stage.prototype.envInfo = function () { return this._envInfo || { light: '', id: '' }; };
 
+  /* ---------- 天气切换 ----------
+     天气作为独立 Group 叠加在任意场景之上，因此"夜景街头 + 雨"
+     "室内窗边 + 雪"这类组合都能成立。切天气只换这一组，不影响其它内容。 */
+  Stage.prototype.setWeather = function (key) {
+    if (!this.ok || !window.GS_ENV) return false;
+    /* 移除旧天气 */
+    if (this.weatherGroup) {
+      this.scene.remove(this.weatherGroup);
+      this.weatherGroup.traverse(function (o) {
+        if (o.geometry) { try { o.geometry.dispose(); } catch (e) {} }
+        if (o.material) { try { o.material.dispose(); } catch (e) {} }
+      });
+      this.weatherGroup = null;
+    }
+    this._weather = key || 'clear';
+    if (this._weather === 'clear') { this._update(0, true); return true; }
+
+    var w = window.GS_ENV.weather(this._weather);
+    if (!w || !w.group) { this._weather = 'clear'; return false; }
+    this.weatherGroup = w.group;
+    this.scene.add(this.weatherGroup);
+    this._weatherInfo = { name: w.name, desc: w.desc };
+    this._update(0, true);
+    return true;
+  };
+  Stage.prototype.weatherInfo = function () {
+    return this._weatherInfo || { name: '', desc: '' };
+  };
+
   /* ---------- 动物：加入 / 移除 / 换种类 ----------
      动物与演员一起构成"被拍对象"，默认站在演员侧前方（构图更自然），
      并做呼吸、摆尾、偶尔抬头等小动作，避免像静止摆件。 */
@@ -979,7 +1235,10 @@
   };
   Stage.prototype.animalInfo = function () { return { kind: this.animalKind }; };
 
-  /* 动物动作：呼吸起伏 + 尾巴摆动 + 头部转动 + 四肢微动 */
+  /* 动物动作：呼吸起伏 + 尾巴摆动 + 头部转动 + 四肢微动
+     配合移动：动物跟随"主演员"而不是固定站位，
+     跟随模式下与演员同步移动，静止模式下也伴随在侧。
+     跟随时动物四肢会真的交替迈步，而不是滑行。 */
   Stage.prototype._updateAnimal = function (p, moving) {
     var an = this.animal;
     if (!an) return;
@@ -988,22 +1247,30 @@
     var m = this.mode;
     var cat = u.isCat;
 
-    /* 站位：演员侧前方，避开演员身体以免重叠 */
-    var baseX = cat ? 0.58 : 0.78;
-    var baseZ = cat ? 0.30 : 0.42;
-    var wander = (m === 'follow') ? Math.sin(t * 0.8) * 0.16 : 0;
-    var x = baseX + wander;
-    var z = baseZ + (m === 'follow' ? Math.cos(t * 0.6) * 0.09 : 0);
+    /* 站位：跟随主演员，保持在其侧前方（随演员朝向一起转） */
+    var A = this._lastActorPos || { x: 0, z: 0 };
+    var face = this._lastActorFace || 0;
+    var followDist = cat ? 0.52 : 0.70;
+    var sideOff = cat ? 0.32 : 0.44;
+    var ang = face + 0.62;
+    var x = A.x + Math.sin(ang) * followDist - Math.cos(ang) * sideOff;
+    var z = A.z + Math.cos(ang) * followDist + Math.sin(ang) * sideOff;
 
-    /* 避障：动物也不能站进道具里 */
+    /* 跟随类镜头下，动物也参与位移（小幅绕行，像真的跟着走） */
+    if (m === 'follow' || m === 'orbit') {
+      x += Math.sin(t * 0.9) * 0.10;
+      z += Math.cos(t * 0.7) * 0.08;
+    }
+
+    /* 避障：动物同样不能站进道具 */
     var ob = this._obstacles;
     if (ob) {
       var rr = ob.resolve(x, z, 0.26);
       x = rr.x; z = rr.z;
     }
     an.position.set(x, 0, z);
-    /* 面朝演员 */
-    an.rotation.y = Math.atan2(-x, -z);
+    /* 面朝主演员（动物跟着人走） */
+    an.rotation.y = Math.atan2(A.x - x, A.z - z);
 
     /* 呼吸：躯干与头部轻微起伏 */
     var rate = cat ? 2.6 : 3.2;
@@ -1031,14 +1298,22 @@
     poseBone(u.neck, new T.Vector3(0, u.bodyY, u.frontZ),
       new T.Vector3(headX * 0.6, headY - u.headR * 0.6, headZ - 0.02));
 
-    /* 四肢：交替轻微踩踏（呼吸带动），让站姿不僵 */
+    /* 四肢：站定时轻微踩踏（呼吸带动）；
+       跟随类手法下改为真正的交替迈步，蹄部前后位移明显，看起来是在走而不是滑。 */
+    var stepping = (m === 'follow' || m === 'orbit') && moving;
+    var stepPh = t * (cat ? 5.4 : 6.2);
     u.legs.forEach(function (lg, i) {
-      var phase = t * rate + i * 1.6;
-      var lift = Math.max(0, Math.sin(phase)) * (cat ? 0.006 : 0.009);
+      /* 左前与右后同相、右前与左后同相（对角步态，猫狗都是这么走的） */
+      var phase = stepPh + (i === 0 ? 0 : Math.PI);
+      var lift = stepping
+        ? Math.max(0, Math.sin(phase)) * (cat ? 0.045 : 0.065)
+        : Math.max(0, Math.sin(t * rate + i * 1.6)) * (cat ? 0.006 : 0.009);
+      /* 迈步时蹄部沿前后方向摆动 */
+      var stride = stepping ? Math.cos(phase) * (cat ? 0.075 : 0.11) : 0;
       poseBone(lg.fUp, new T.Vector3(lg.x, u.bodyY, lg.fz), new T.Vector3(lg.x, lg.kneeY, lg.fz));
-      poseBone(lg.fLo, new T.Vector3(lg.x, lg.kneeY, lg.fz), new T.Vector3(lg.x, lift, lg.fz));
+      poseBone(lg.fLo, new T.Vector3(lg.x, lg.kneeY, lg.fz), new T.Vector3(lg.x, lift, lg.fz + stride));
       poseBone(lg.bUp, new T.Vector3(lg.x, u.bodyY, lg.bz), new T.Vector3(lg.x, lg.kneeY, lg.bz));
-      poseBone(lg.bLo, new T.Vector3(lg.x, lg.kneeY, lg.bz), new T.Vector3(lg.x, lift, lg.bz));
+      poseBone(lg.bLo, new T.Vector3(lg.x, lg.kneeY, lg.bz), new T.Vector3(lg.x, lift, lg.bz - stride));
     });
 
     /* 标签跟随（贴在头顶上方一点） */
@@ -1176,7 +1451,61 @@
       C.pitch = Math.asin(Math.max(-1, Math.min(1, dir2.y)));
     }
 
-    return { A: A, C: C, camLookAt: camLookAt, label: label };
+    /* ---- 多角色排布 ----
+       主演员/主摄影师就是上面算出的 A / C。
+       其余成员围绕主体做编队排布，且要互相错开、不与主角色重叠：
+         演员：在主演员侧后方排开，越靠后越往外
+         摄影师：以主摄影师为圆心分散开，保持各自机位独立 */
+    var all = { actors: [], shooters: [] };
+
+    /* 主演员 + 用户手动偏移 */
+    var moA0 = this.manualOffset.a[0] || { x: 0, z: 0 };
+    all.actors.push({ pos: new T.Vector3(A.pos.x + moA0.x, 0, A.pos.z + moA0.z), face: A.face });
+
+    /* 其余演员：以主演员为基准，按角度扇形展开 */
+    for (var ai = 1; ai < this.actors.length; ai++) {
+      /* 每个人占一个固定角度，半径略大，保证不挤在一起 */
+      var ang = A.face + (ai % 2 ? 1 : -1) * (0.55 + Math.floor((ai + 1) / 2) * 0.42);
+      var rad = 0.85 + ai * 0.30;
+      var ax = A.pos.x + Math.sin(ang) * rad;
+      var az = A.pos.z + Math.cos(ang) * rad;
+      var mo = this.manualOffset.a[ai] || { x: 0, z: 0 };
+      ax += mo.x; az += mo.z;
+      all.actors.push({
+        pos: new T.Vector3(ax, 0, az),
+        face: Math.atan2(A.pos.x - ax, A.pos.z - az)
+      });
+    }
+
+    /* 主摄影师 + 手动偏移 */
+    var moC0 = this.manualOffset.s[0] || { x: 0, z: 0 };
+    all.shooters.push({ pos: new T.Vector3(C.pos.x + moC0.x, 0, C.pos.z + moC0.z), yaw: C.yaw });
+
+    /* 其余摄影师：绕主摄影师分散，且都朝向主演员 */
+    for (var ci = 1; ci < this.shooters.length; ci++) {
+      var side = ci % 2 ? 1 : -1;
+      var spread = 0.75 + Math.ceil(ci / 2) * 0.55;
+      var sx = C.pos.x + side * spread;
+      var sz = C.pos.z + (ci % 2 ? 0.25 : -0.15);
+      var mos = this.manualOffset.s[ci] || { x: 0, z: 0 };
+      sx += mos.x; sz += mos.z;
+      var yw = Math.atan2(A.pos.x - sx, A.pos.z - sz);
+      all.shooters.push({ pos: new T.Vector3(sx, 0, sz), yaw: yw });
+    }
+
+    /* 统一避障：所有成员都不许站进道具 */
+    if (ob) {
+      for (var oa = 0; oa < all.actors.length; oa++) {
+        var r2 = ob.resolve(all.actors[oa].pos.x, all.actors[oa].pos.z, 0.42);
+        all.actors[oa].pos.x = r2.x; all.actors[oa].pos.z = r2.z;
+      }
+      for (var os = 0; os < all.shooters.length; os++) {
+        var r3 = ob.resolve(all.shooters[os].pos.x, all.shooters[os].pos.z, 0.40);
+        all.shooters[os].pos.x = r3.x; all.shooters[os].pos.z = r3.z;
+      }
+    }
+
+    return { A: A, C: C, all: all, camLookAt: camLookAt, label: label };
   };
 
   Stage.prototype._update = function (dt, force) {
@@ -1184,29 +1513,19 @@
     var p = this.dur > 0 ? Math.min(1, this.t / this.dur) : 0;
     var st = this._compute(p);
 
-    /* 演员 */
-    this.actor.position.copy(st.A.pos);
-    this.actor.rotation.y = st.A.face;
-    this.actorFlag.position.set(st.A.pos.x, 1.95, st.A.pos.z);
-    if (this.actorLabel) this.actorLabel.position.set(st.A.pos.x, 2.25, st.A.pos.z);
-
-    /* 摄影师 */
-    this.shooter.position.set(st.C.pos.x, 0, st.C.pos.z);
-    this.shooter.userData.camGrp.position.set(0, st.C.pos.y - 1.36, 0);
-    if (this.shooterLabel) this.shooterLabel.position.set(st.C.pos.x, 1.90, st.C.pos.z);
-    /* 机身 + 视锥朝向 */
-    var cg = this.shooter.userData.camGrp;
-    cg.rotation.set(0, st.C.yaw, 0);
-    this.frustum.rotation.set(-st.C.pitch, 0, 0);
-    /* 刷新仰角/俯角标识（几何 + 数值标签） */
-    updateFrustumAngle(this.frustum, st.C.pitch);
-    this.shooter.rotation.y = st.C.yaw;
-
     /* 走路摆臂：按进度做正弦摆动，让火柴人不是"滑行" */
     var moving = this.playing ? 1 : 0;
     var a = this.actor.userData, sh = this.shooter.userData;
 
-    /* ---- 演员动作：由当前手法决定"演什么"（含各关节的两节骨） ---- */
+    /* ---- 主演员位置（含用户手动偏移） ---- */
+    this.actor.position.copy(st.all.actors[0].pos);
+    this.actor.position.y = 0;
+
+    /* ---- 主摄影师位置（含用户手动偏移） ---- */
+    this.shooter.position.copy(st.all.shooters[0].pos);
+    this.shooter.rotation.y = st.all.shooters[0].yaw;
+
+    /* ---- 主演员动作：由当前手法决定"演什么"（含各关节的两节骨） ---- */
     var perf = this._actorPerf(p, moving);
     applySkeleton(a, perf);
     /* 躯干整体起伏：走路时上下颠簸，让动作有重量感 */
@@ -1214,19 +1533,67 @@
     /* 转身/侧身：围绕手法需要做细微身体转动 */
     this.actor.rotation.y = st.A.face + perf.lean;
 
-    /* ---- 动物（若启用）：跟随演员位置做对应动作 ---- */
+    /* ---- 其余演员：同手法驱动，但步相位错开，避免多人动作整齐得像复制人 ---- */
+    for (var oi = 1; oi < this.actors.length; oi++) {
+      var af = this.actors[oi];
+      var ud = af.userData;
+      var phShift = oi * 1.9;                      // 相位错开
+      var perf2 = this._actorPerf(p, moving, phShift);
+      applySkeleton(ud, perf2);
+      af.position.copy(st.all.actors[oi].pos);
+      af.position.y = perf2.bob;
+      af.rotation.y = st.all.actors[oi].face + perf2.lean;
+    }
+
+    /* ---- 动物（若启用）：跟随主演员位置做对应动作 ---- */
     if (this.animal) {
+      /* 记录主演员位置与朝向，供动物跟随 */
+      this._lastActorPos = { x: st.all.actors[0].pos.x, z: st.all.actors[0].pos.z };
+      this._lastActorFace = st.all.actors[0].face;
       this._updateAnimal(p, moving);
     }
 
-    /* ---- 摄影师：持机姿态 + 步伐 ---- */
+    /* ---- 主摄影师：持机姿态 + 步伐 ---- */
     var sp = this._shooterPerf(p, moving);
     applySkeleton(sh, sp);
     this.shooter.position.y = sp.bob;
 
+    /* ---- 装备挂到手上 ----
+       applySkeleton 已经把双手腕摆好，这里读出腕部的局部坐标，
+       取双手连线的中点作为装备握持点，于是相机真正"长在手上"：
+       摆臂时相机跟着手走，不会飘在身前。
+       机身整体朝向仍由云台 yaw 决定（镜头朝 +Z 的统一约定不变）。 */
+    var rigGrp = this.shooter.userData.camGrp;
+    var gripMid = new T.Vector3().addVectors(sp.wristL, sp.wristR).multiplyScalar(0.5);
+    rigGrp.position.copy(gripMid);
+
+    /* 机身 + 视锥朝向（局部坐标系内） */
+    rigGrp.rotation.set(0, st.C.yaw, 0);
+    if (this.frustum) {
+      this.frustum.rotation.set(-st.C.pitch, 0, 0);
+      /* 刷新仰角/俯角标识（几何 + 数值标签） */
+      updateFrustumAngle(this.frustum, st.C.pitch);
+    }
+
+    /* ---- 其余摄影师：同样持机，装备也挂在自己手上 ---- */
+    for (var oi2 = 1; oi2 < this.shooters.length; oi2++) {
+      var sf = this.shooters[oi2];
+      var sud = sf.userData;
+      var sp2 = this._shooterPerf(p, moving, oi2 * 1.3);
+      applySkeleton(sud, sp2);
+      sf.position.copy(st.all.shooters[oi2].pos);
+      sf.position.y = sp2.bob;
+      sf.rotation.y = st.all.shooters[oi2].yaw;
+      /* 装备同样长在手上 */
+      var rig2 = sud.camGrp;
+      var gm2 = new T.Vector3().addVectors(sp2.wristL, sp2.wristR).multiplyScalar(0.5);
+      rig2.position.copy(gm2);
+      rig2.rotation.set(0, st.all.shooters[oi2].yaw, 0);
+    }
+
     /* ---- 云台三轴：按运镜需要独立转动，让云台动作肉眼可见 ---- */
     var rigU = null;
-    if (cg.children.length) rigU = cg.children[0].userData;
+    if (rigGrp.children.length) rigU = rigGrp.children[0].userData;
     if (rigU) {
       /* 偏航轴：甩镜时大幅转动，其余跟随机身朝向做微调 */
       rigU.yawGrp.rotation.y = sp.yaw;
@@ -1242,18 +1609,60 @@
       }
     }
 
+    /* ---- 标签与头顶箭头：跟随各自主角 ---- */
+    for (var li = 0; li < this.actors.length; li++) {
+      var pos = (li === 0) ? st.A.pos : st.all.actors[li].pos;
+      if (this.actorLabels[li]) this.actorLabels[li].position.set(pos.x, 2.25, pos.z);
+      if (this.actorFlags[li]) this.actorFlags[li].position.set(pos.x, 1.95, pos.z);
+    }
+    for (var lj = 0; lj < this.shooters.length; lj++) {
+      var posS = (lj === 0) ? st.C.pos : st.all.shooters[lj].pos;
+      if (this.shooterLabels[lj]) this.shooterLabels[lj].position.set(posS.x, 1.90, posS.z);
+    }
+
     /* 轨迹：把已走过的路径画出来 */
     if (force || this.playing) {
-      var camPts = [], actPts = [];
       var N = 40;
-      for (var i = 0; i <= N; i++) {
-        var pp = (i / N) * p;
-        var s2 = this._compute(pp);
-        camPts.push(new T.Vector3(s2.C.pos.x, 0.02, s2.C.pos.z));
-        actPts.push(new T.Vector3(s2.A.pos.x, 0.02, s2.A.pos.z));
+      for (var ti = 0; ti < this.actors.length; ti++) {
+        var actPts = [];
+        for (var i = 0; i <= N; i++) {
+          var s2 = this._compute(i / N * p);
+          actPts.push(new T.Vector3(s2.all.actors[ti].pos.x, 0.02, s2.all.actors[ti].pos.z));
+        }
+        setTrack(this.actorTracks[ti], actPts);
       }
-      setTrack(this.camTrack, camPts);
-      setTrack(this.actorTrack, actPts);
+      for (var tj = 0; tj < this.shooters.length; tj++) {
+        var camPts = [];
+        for (var k = 0; k <= N; k++) {
+          var s3 = this._compute(k / N * p);
+          camPts.push(new T.Vector3(s3.all.shooters[tj].pos.x, 0.02, s3.all.shooters[tj].pos.z));
+        }
+        setTrack(this.camTracks[tj], camPts);
+      }
+    }
+
+    /* ---- 天气粒子动画（雨下落 / 雪飘落、雾片呼吸） ---- */
+    if (this.weatherGroup) {
+      var wg = this.weatherGroup;
+      var kind = wg.userData.kind;
+      var dtW = (dt == null || dt <= 0) ? 1 / 60 : Math.min(dt, 0.05);
+      var tt = this.t;
+      wg.children.forEach(function (o) {
+        if (!o.userData || o.userData.fall == null) return;
+        var ud = o.userData;
+        o.position.y -= ud.fall * dtW;
+        if (o.position.y < 0) {
+          o.position.y = 5.0 + Math.random() * 0.6;
+          /* 落到底后重新散布，避免总是同一位置 */
+          var ang = Math.random() * Math.PI * 2, rad = 1.2 + Math.random() * 5.0;
+          o.position.x = Math.cos(ang) * rad;
+          o.position.z = Math.sin(ang) * rad;
+        }
+        /* 雪加横向飘动 */
+        if (kind === 'snow') {
+          o.position.x += Math.sin(tt * 1.4 + (ud.sway || 0)) * 0.0022;
+        }
+      });
     }
 
     this.lastState = st;
@@ -1272,12 +1681,13 @@
 
     if (mode === 'follow') {
       /* 跟机视角：相机放到镜头前方一点（而不是机身中心），
-         否则会从火柴人躯干内部往外看，画面被自己的身体挡住、看不出构图。 */
+         否则会从火柴人躯干内部往外看，画面被自己的身体挡住、看不出构图。
+         镜头朝 +Z（与人物正面统一的约定），所以前移方向取 (0,0,+1)。 */
       var cg = this.shooter.userData.camGrp;
       var wp = new T.Vector3();
       cg.getWorldPosition(wp);
       var quat = cg.getWorldQuaternion(new T.Quaternion());
-      var dir = new T.Vector3(0, 0, -1).applyQuaternion(quat);
+      var dir = new T.Vector3(0, 0, 1).applyQuaternion(quat);
       /* 沿镜头朝向前移 0.30m（越过机身与镜筒），并略微上抬到取景眼位 */
       var pos = wp.clone().addScaledVector(dir, 0.30);
       pos.y += 0.04;
@@ -1353,12 +1763,15 @@
   /* ---------- 演员演技：按手法生成四肢端点与身体起伏 ----------
      所有端点都是相对躯干原点的局部坐标（与 makeStick 的关节高度统一）。
      走路用反相正弦驱动四肢；不同手法叠加各自的"表演"（抬手、转身、定格等）。 */
-  Stage.prototype._actorPerf = function (p, moving) {
+  /* ---------- 演员演技：按手法生成四肢端点与身体起伏 ----------
+     phaseShift：步进相位偏移。多演员同屏时给每人不同相位，
+     动作就不至于整齐得像复制粘贴。 */
+  Stage.prototype._actorPerf = function (p, moving, phaseShift) {
     var a = this.actor.userData;
     var m = this.mode;
     /* 步频：走位越快的镜头，步频越高 */
     var cadence = (m === 'follow' || m === 'whip') ? 8.2 : (m === 'orbit' || m === 'crane') ? 5.4 : 6.4;
-    var ph = this.t * cadence;
+    var ph = this.t * cadence + (phaseShift || 0);
     var A = moving ? 1 : 0;
 
     /* 基本走路周期：
@@ -1478,13 +1891,13 @@
   };
 
   /* ---------- 摄影师动作：持机步态 + 云台三轴 ---------- */
-  Stage.prototype._shooterPerf = function (p, moving) {
+  Stage.prototype._shooterPerf = function (p, moving, phaseShift) {
     var sh = this.shooter.userData;
     var m = this.mode;
     var A = moving ? 1 : 0;
     /* 摄影师的步伐比演员更小更稳（要保证画面不抖） */
     var cadence = (m === 'follow' || m === 'whip') ? 7.0 : (m === 'orbit' ? 5.2 : 6.0);
-    var ph = this.t * cadence;
+    var ph = this.t * cadence + (phaseShift || 0);
     var swing = Math.sin(ph) * 0.14 * A;
     var bob = Math.abs(Math.sin(ph)) * 0.018 * A;
 

@@ -354,14 +354,18 @@
      ============================================================ */
   var stage = null, stageReady = false, plan = null, curMoveIdx = 0, rafProg = 0;
   var curEnvId = null, curEnvManual = false, curAnimal = 'none';
+  var curWeather = 'clear', curNActor = 1, curNShooter = 1;
 
   /* 可切换的预演场景（id 与 scene-env.js / cinematography.js 对齐） */
   var ENV_LIST = [
     { id: 'indoor-window', short: '室内窗边', tip: '单侧窗光 · 柔和侧光，适合家居/日常/治愈' },
     { id: 'cafe-mood', short: '咖啡馆', tip: '窗光 + 暖色吊灯，适合探店/下午茶/聊天' },
     { id: 'street-night', short: '夜景街头', tip: '霓虹冷暖对冲 + 路灯，适合探店/都市/情绪' },
+    { id: 'street-day', short: '街道日景', tip: '日间散射光，适合街访/城市漫步/纪实' },
     { id: 'sports-arena', short: '天台/运动', tip: '顶光 + 侧逆光，适合运动/热血/竞技' },
     { id: 'studio-clean', short: '棚拍', tip: '主柔光 + 侧逆光勾边，适合产品/开箱/带货' },
+    { id: 'ring-studio', short: '环形直播间', tip: '环形灯主光 + 柔光箱，适合口播/直播' },
+    { id: 'office', short: '办公室', tip: '落地窗自然光，适合职场/访谈/会议' },
     { id: 'outdoor-golden', short: '户外黄金', tip: '低角度暖阳逆光，适合旅行/户外/人像' },
     { id: 'rain-reflect', short: '雨后反光', tip: '街灯硬光 + 湿地倒影，适合氛围/情绪' },
     { id: 'generic', short: '通用外景', tip: '中性空间，未识别场景时的默认环境' }
@@ -400,8 +404,12 @@
       var envDef = ENV_LIST.filter(function (e) { return e.id === info.id; })[0];
       if (envDef) {
         line.hidden = false;
+        var wi = stage.weatherInfo();
+        var wx = curWeather && curWeather !== 'clear'
+          ? '　|　天气：<b>' + esc(wi.name || curWeather) + '</b> · ' + esc(wi.desc || '')
+          : '';
         line.innerHTML = '当前场景：<b>' + esc(envDef.short) + '</b> · ' +
-          esc(envDef.tip) + (info.light ? '　|　光线：' + esc(info.light) : '');
+          esc(envDef.tip) + (info.light ? '　|　光线：' + esc(info.light) : '') + wx;
       } else {
         line.hidden = true;
       }
@@ -482,6 +490,51 @@
       });
     }
 
+    /* 天气：晴朗 / 降雨 / 降雪 / 雾气 / 黄昏逆光 */
+    var weather = $('#ocWeather');
+    if (weather) {
+      $$('button', weather).forEach(function (b) {
+        b.addEventListener('click', function () {
+          $$('button', weather).forEach(function (x) { x.classList.toggle('on', x === b); });
+          curWeather = b.dataset.w;
+          if (stage && stage.ok) {
+            stage.setWeather(curWeather);
+            stage.invalidate();
+            syncEnvButtons();
+          }
+        });
+      });
+    }
+
+    /* 演员 / 摄影师数量 */
+    var ac = $('#ocActorCount');
+    if (ac) {
+      $$('button', ac).forEach(function (b) {
+        b.addEventListener('click', function () {
+          $$('button', ac).forEach(function (x) { x.classList.toggle('on', x === b); });
+          curNActor = +b.dataset.n;
+          if (stage && stage.ok) { stage.setCastCount(curNActor, curNShooter); stage.invalidate(); }
+        });
+      });
+    }
+    var sc = $('#ocShooterCount');
+    if (sc) {
+      $$('button', sc).forEach(function (b) {
+        b.addEventListener('click', function () {
+          $$('button', sc).forEach(function (x) { x.classList.toggle('on', x === b); });
+          curNShooter = +b.dataset.n;
+          if (stage && stage.ok) { stage.setCastCount(curNActor, curNShooter); stage.invalidate(); }
+        });
+      });
+    }
+    /* 重置手动位置 */
+    var rp = $('#ocResetPos');
+    if (rp) {
+      rp.addEventListener('click', function () {
+        if (stage && stage.ok) stage.resetManualOffsets();
+      });
+    }
+
     /* 场景环境切换 */
     var envPick = $('#ocEnvPick');
     if (envPick) {
@@ -528,8 +581,10 @@
       };
       stage.setOrbit('free');
       stage.setMove((plan && plan.demo && plan.demo.mode) || 'dolly');
-      /* 恢复用户此前选择的动物 */
+      /* 恢复用户此前选择的动物 / 天气 / 人数 */
       if (curAnimal && curAnimal !== 'none') stage.setAnimal(curAnimal);
+      if (curWeather && curWeather !== 'clear') stage.setWeather(curWeather);
+      if (curNActor !== 1 || curNShooter !== 1) stage.setCastCount(curNActor, curNShooter);
       stage.reset();
       /* 进入可交互的静止状态，保证未播放时也能自由调视角 */
       stage.invalidate();

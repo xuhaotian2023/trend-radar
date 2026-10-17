@@ -1486,7 +1486,12 @@ hr,.rank-hr{border-color:var(--rule)}
 .oc-envline b{color:var(--az)}
 /* 操作提示 */
 .oc-modehint{margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.02em}
+.oc-modehint b{color:var(--az);font-weight:700}
 .oc-ctrl{flex-wrap:wrap;row-gap:8px}
+/* 人数选择：数字按钮，比文字短，便于与其它控制项同行 */
+.oc-count{gap:2px}
+.oc-count button{min-width:26px;padding:4px 6px;text-align:center;font-family:var(--mono);font-size:11px}
+.oc-count button.on{background:rgba(109,94,252,.24);color:#fff;border-color:rgba(109,94,252,.5)}
 
 /* 解构台：面板玻璃化 + 按钮统一为设计系统外观 */
 .az-badge{border-radius:7px;border-color:rgba(34,211,238,.32);background:rgba(34,211,238,.05)}
